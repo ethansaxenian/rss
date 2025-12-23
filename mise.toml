@@ -1,0 +1,27 @@
+[env]
+GOOSE_MIGRATION_DIR = './migrations'
+GOOSE_DRIVER = 'sqlite3'
+GOOSE_DBSTRING = './rss.db'
+
+[tasks.build]
+run = "go build -o ./bin/main"
+
+[tasks.run]
+depends = ["build"]
+run = "./bin/main"
+
+[tasks.migrate]
+run =	"go tool goose up"
+
+[tasks.migrate-create]
+usage = '''
+arg "<name>"
+'''
+run =	"go tool goose create ${usage_name?} sql"
+
+[tasks.migrate-rollback]
+run =	"go tool goose down"
+
+[tasks.sql]
+run =	"go tool sqlc generate"
+

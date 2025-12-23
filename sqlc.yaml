@@ -1,0 +1,11 @@
+version: "2"
+sql:
+  - engine: "sqlite"
+    queries: "queries"
+    schema: "migrations"
+    gen:
+      go:
+        out: "database"
+        emit_empty_slices: true
+        rename:
+          url: "URL"
