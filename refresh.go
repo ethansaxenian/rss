@@ -12,16 +12,16 @@ import (
 )
 
 const (
-	refreshLoopInterval    = 1 * time.Minute
+	refreshLoopInterval    = 60 * time.Minute
 	maxConcurrentRefreshes = 5
 	feedRefreshTimeout     = 15 * time.Second
 )
 
-func refreshLoop(ctx context.Context) {
+func refreshLoop(ctx context.Context, db *sql.DB) {
 	ticker := time.Tick(refreshLoopInterval)
 
 	for {
-		if err := refreshFeeds(ctx); err != nil {
+		if err := refreshFeeds(ctx, db); err != nil {
 			slog.Error("Error refreshing feeds", "error", err)
 		}
 		select {
@@ -34,13 +34,8 @@ func refreshLoop(ctx context.Context) {
 	}
 }
 
-func refreshFeeds(ctx context.Context) error {
+func refreshFeeds(ctx context.Context, db *sql.DB) error {
 	slog.Info("Starting feed refresh.", "next_refresh", time.Now().Add(refreshLoopInterval))
-
-	db, err := sql.Open("sqlite", database.DSN)
-	if err != nil {
-		return fmt.Errorf("opening db connection: %w", err)
-	}
 
 	var eg errgroup.Group
 	eg.SetLimit(maxConcurrentRefreshes)
@@ -77,7 +72,7 @@ func refreshFeed(ctx context.Context, db *sql.DB, feed database.Feed) error {
 		return fmt.Errorf("fetching feed: %w", err)
 	}
 
-	tx, err := db.Begin()
+	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("starting transaction: %w", err)
 	}

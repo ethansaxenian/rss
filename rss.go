@@ -10,7 +10,11 @@ import (
 	"time"
 )
 
-var ErrCannotParseDate = errors.New("failed to parse date")
+const (
+	defaultFetchTimeout = 5 * time.Second
+)
+
+var ErrUnknownLayout = errors.New("unknown layout")
 
 type RSSTime struct {
 	time.Time
@@ -19,7 +23,7 @@ type RSSTime struct {
 func (t *RSSTime) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
 	var v string
 	if err := d.DecodeElement(&v, &start); err != nil {
-		return err
+		return fmt.Errorf("decoding element: %w", err)
 	}
 
 	v = strings.TrimSpace(v)
@@ -39,7 +43,7 @@ func (t *RSSTime) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
 		}
 	}
 
-	return fmt.Errorf("rss: cannot parse date %q", v)
+	return fmt.Errorf("parsing date %q: %w", v, ErrUnknownLayout)
 }
 
 type RSS struct {
@@ -59,7 +63,7 @@ type Item struct {
 }
 
 func fetchFeed(ctx context.Context, url string) (Channel, error) {
-	client := http.Client{Timeout: 5 * time.Second}
+	client := http.Client{Timeout: defaultFetchTimeout}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {

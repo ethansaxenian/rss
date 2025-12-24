@@ -1,4 +1,17 @@
 version: "2"
-
 linters:
-  enable-all: true
+  default: "standard"
+  enable:
+    - err113
+    - mnd
+    - noctx
+    - wrapcheck
+  exclusions:
+    rules:
+      - linters:
+          - errcheck
+        source: "^\\s*defer\\s+"
+  settings:
+    wrapcheck:
+      ignore-sig-regexps:
+        - \.Render\(

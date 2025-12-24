@@ -1,14 +1,36 @@
 [env]
+DATABASE_DSN = './rss.db'
+SERVER_PORT = 3000
+
 GOOSE_MIGRATION_DIR = './migrations'
 GOOSE_DRIVER = 'sqlite3'
-GOOSE_DBSTRING = './rss.db'
+GOOSE_DBSTRING = '{{env.DATABASE_DSN}}'
 
 [tasks.build]
+depends = ['sql', 'templ']
 run = "go build -o ./bin/main"
 
 [tasks.run]
 depends = ["build"]
 run = "./bin/main"
+
+[tasks.live-server]
+run = '''
+air \
+  --build.cmd "go build -o ./bin/main" \
+  --build.bin "./bin/main" \
+  --build.include_ext "go,templ" \
+  --build.delay 100 \
+  --build.exclude_unchanged "true"
+'''
+
+[tasks.live-templ]
+run = 'templ generate --watch --proxy="http://localhost:{{env.SERVER_PORT}}" --open-browser=true -v'
+
+[tasks.dev]
+run = [
+  {tasks = ['live-server', 'live-templ']}
+]
 
 [tasks.migrate]
 run =	"go tool goose up"
@@ -25,3 +47,5 @@ run =	"go tool goose down"
 [tasks.sql]
 run =	"go tool sqlc generate"
 
+[tasks.templ]
+run =	"go tool templ generate"

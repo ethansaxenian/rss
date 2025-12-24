@@ -1,0 +1,51 @@
+package components
+
+import (
+	"github.com/ethansaxenian/rss/database"
+	"fmt"
+)
+
+templ UnreadPage(items []database.ListUnreadRow, page int) {
+	@Base() {
+		<div class="flex flex-col items-center w-full">
+			if page == 0 {
+				<h1 class="text-3xl mb-5">Unread</h1>
+			}
+			<span
+				class="flex flex-col items-center w-full"
+			>
+				for i, item := range items {
+					@Item(item, page, i == len(items)-1)
+				}
+			</span>
+		</div>
+	}
+}
+
+templ Item(item database.ListUnreadRow, page int, lastItem bool) {
+	<article
+		class="rounded-md m-2 p-2 bg-zinc-800 border border-gray-500 flex flex-col w-full md:w-200 max-w-full"
+		if lastItem {
+			hx-get={ fmt.Sprintf("/unread/?page=%d", page+1) }
+			hx-trigger="intersect once"
+			hx-swap="afterend"
+		}
+	>
+		<a class="text-lg hover:text-white w-fit" href={ templ.SafeURL(item.Link) } target="_blank">{ item.Title }</a>
+		<span class="text-sm">
+			{ item.Feed.Title } | { item.PublishedAt.Format("Jan _2") } |
+			<span>
+				@MarkAsRead(item)
+			</span>
+		</span>
+	</article>
+}
+
+templ MarkAsRead(item database.ListUnreadRow) {
+	<span
+		class="hover:text-zinc-500 hover:cursor-pointer"
+		hx-post={ fmt.Sprintf("/items/%d/read", item.ID) }
+		hx-target="closest article"
+		hx-swap="outerHTML swap"
+	>Mark as read</span>
+}

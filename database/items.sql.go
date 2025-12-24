@@ -32,3 +32,77 @@ func (q *Queries) CreateItem(ctx context.Context, arg CreateItemParams) error {
 	)
 	return err
 }
+
+const listUnread = `-- name: ListUnread :many
+SELECT items.id, items.feed_id, items.title, items.link, items.description, items.status, items.published_at, items.created_at, items.updated_at, feeds.id, feeds.title, feeds.url, feeds.created_at, feeds.updated_at, feeds.last_refreshed_at FROM items
+JOIN feeds ON items.feed_id = feeds.id
+WHERE items.status = 'unread'
+ORDER BY items.published_at DESC
+LIMIT ? OFFSET ?
+`
+
+type ListUnreadParams struct {
+	Limit  int64
+	Offset int64
+}
+
+type ListUnreadRow struct {
+	ID          int64
+	FeedID      int64
+	Title       string
+	Link        string
+	Description string
+	Status      Status
+	PublishedAt time.Time
+	CreatedAt   time.Time
+	UpdatedAt   *time.Time
+	Feed        Feed
+}
+
+func (q *Queries) ListUnread(ctx context.Context, arg ListUnreadParams) ([]ListUnreadRow, error) {
+	rows, err := q.db.QueryContext(ctx, listUnread, arg.Limit, arg.Offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListUnreadRow{}
+	for rows.Next() {
+		var i ListUnreadRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.FeedID,
+			&i.Title,
+			&i.Link,
+			&i.Description,
+			&i.Status,
+			&i.PublishedAt,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.Feed.ID,
+			&i.Feed.Title,
+			&i.Feed.URL,
+			&i.Feed.CreatedAt,
+			&i.Feed.UpdatedAt,
+			&i.Feed.LastRefreshedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const markRead = `-- name: MarkRead :exec
+UPDATE items SET status = 'read' WHERE id = ?
+`
+
+func (q *Queries) MarkRead(ctx context.Context, id int64) error {
+	_, err := q.db.ExecContext(ctx, markRead, id)
+	return err
+}
