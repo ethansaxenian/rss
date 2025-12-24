@@ -9,8 +9,8 @@ import (
 	"context"
 )
 
-const createFeed = `-- name: CreateFeed :one
-INSERT INTO feeds(title, url) VALUES (?, ?) RETURNING id, title, url, created_at, updated_at
+const createFeed = `-- name: CreateFeed :exec
+INSERT INTO feeds(title, url) VALUES (?, ?)
 `
 
 type CreateFeedParams struct {
@@ -18,21 +18,13 @@ type CreateFeedParams struct {
 	URL   string
 }
 
-func (q *Queries) CreateFeed(ctx context.Context, arg CreateFeedParams) (Feed, error) {
-	row := q.db.QueryRowContext(ctx, createFeed, arg.Title, arg.URL)
-	var i Feed
-	err := row.Scan(
-		&i.ID,
-		&i.Title,
-		&i.URL,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-	)
-	return i, err
+func (q *Queries) CreateFeed(ctx context.Context, arg CreateFeedParams) error {
+	_, err := q.db.ExecContext(ctx, createFeed, arg.Title, arg.URL)
+	return err
 }
 
 const listFeeds = `-- name: ListFeeds :many
-SELECT id, title, url, created_at, updated_at FROM feeds
+SELECT id, title, url, created_at, updated_at, last_refreshed_at FROM feeds ORDER BY created_at DESC
 `
 
 func (q *Queries) ListFeeds(ctx context.Context) ([]Feed, error) {
@@ -50,6 +42,7 @@ func (q *Queries) ListFeeds(ctx context.Context) ([]Feed, error) {
 			&i.URL,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.LastRefreshedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -62,4 +55,13 @@ func (q *Queries) ListFeeds(ctx context.Context) ([]Feed, error) {
 		return nil, err
 	}
 	return items, nil
+}
+
+const updateFeedLastRefreshedAt = `-- name: UpdateFeedLastRefreshedAt :exec
+UPDATE feeds SET last_refreshed_at = CURRENT_TIMESTAMP WHERE id = ?
+`
+
+func (q *Queries) UpdateFeedLastRefreshedAt(ctx context.Context, id int64) error {
+	_, err := q.db.ExecContext(ctx, updateFeedLastRefreshedAt, id)
+	return err
 }

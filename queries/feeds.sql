@@ -1,5 +1,8 @@
 -- name: ListFeeds :many
-SELECT * FROM feeds;
+SELECT * FROM feeds ORDER BY created_at DESC;
 
--- name: CreateFeed :one
-INSERT INTO feeds(title, url) VALUES (?, ?) RETURNING *;
+-- name: CreateFeed :exec
+INSERT INTO feeds(title, url) VALUES (?, ?);
+
+-- name: UpdateFeedLastRefreshedAt :exec
+UPDATE feeds SET last_refreshed_at = CURRENT_TIMESTAMP WHERE id = ?;
