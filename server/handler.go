@@ -1,14 +1,12 @@
 package server
 
 import (
-	"context"
 	"database/sql"
 	"errors"
-	"log/slog"
 	"net/http"
 )
 
-type APIFunc func(ctx context.Context, log *slog.Logger, conn *sql.Conn, w http.ResponseWriter, r *http.Request) error
+type APIFunc func(conn *sql.Conn, w http.ResponseWriter, r *http.Request) error
 
 // Handle wraps an [APIFunc] into an [http.HandlerFunc].
 func (s *Server) Handle(h APIFunc) http.HandlerFunc {
@@ -23,7 +21,7 @@ func (s *Server) Handle(h APIFunc) http.HandlerFunc {
 		}
 		defer conn.Close()
 
-		if err := h(ctx, s.log, conn, w, r); err != nil {
+		if err := h(conn, w, r); err != nil {
 			s.log.Error("Error in handler func", "error", err.Error(), "method", r.Method, "path", r.URL, "remoteAddr", r.RemoteAddr)
 
 			var apiErr APIError

@@ -6,3 +6,10 @@ const (
 	StatusUnread Status = "unread"
 	StatusRead   Status = "read"
 )
+
+func AllStatusValues() []Status {
+	return []Status{
+		StatusRead,
+		StatusUnread,
+	}
+}

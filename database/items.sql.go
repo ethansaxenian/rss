@@ -10,6 +10,17 @@ import (
 	"time"
 )
 
+const countItems = `-- name: CountItems :one
+SELECT COUNT(*) FROM items WHERE items.status = ?
+`
+
+func (q *Queries) CountItems(ctx context.Context, status Status) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countItems, status)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createItem = `-- name: CreateItem :exec
 INSERT INTO items(feed_id, title, link, description, published_at) VALUES (?, ?, ?, ?, ?)
 `
@@ -33,20 +44,21 @@ func (q *Queries) CreateItem(ctx context.Context, arg CreateItemParams) error {
 	return err
 }
 
-const listUnread = `-- name: ListUnread :many
+const listItems = `-- name: ListItems :many
 SELECT items.id, items.feed_id, items.title, items.link, items.description, items.status, items.published_at, items.created_at, items.updated_at, feeds.id, feeds.title, feeds.url, feeds.created_at, feeds.updated_at, feeds.last_refreshed_at FROM items
 JOIN feeds ON items.feed_id = feeds.id
-WHERE items.status = 'unread'
+WHERE items.status = ?
 ORDER BY items.published_at DESC
 LIMIT ? OFFSET ?
 `
 
-type ListUnreadParams struct {
+type ListItemsParams struct {
+	Status Status
 	Limit  int64
 	Offset int64
 }
 
-type ListUnreadRow struct {
+type ListItemsRow struct {
 	ID          int64
 	FeedID      int64
 	Title       string
@@ -59,15 +71,15 @@ type ListUnreadRow struct {
 	Feed        Feed
 }
 
-func (q *Queries) ListUnread(ctx context.Context, arg ListUnreadParams) ([]ListUnreadRow, error) {
-	rows, err := q.db.QueryContext(ctx, listUnread, arg.Limit, arg.Offset)
+func (q *Queries) ListItems(ctx context.Context, arg ListItemsParams) ([]ListItemsRow, error) {
+	rows, err := q.db.QueryContext(ctx, listItems, arg.Status, arg.Limit, arg.Offset)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []ListUnreadRow{}
+	items := []ListItemsRow{}
 	for rows.Next() {
-		var i ListUnreadRow
+		var i ListItemsRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.FeedID,
@@ -98,11 +110,25 @@ func (q *Queries) ListUnread(ctx context.Context, arg ListUnreadParams) ([]ListU
 	return items, nil
 }
 
-const markRead = `-- name: MarkRead :exec
-UPDATE items SET status = 'read' WHERE id = ?
+const markAllItemsAsRead = `-- name: MarkAllItemsAsRead :exec
+UPDATE items SET status = "read" WHERE status = "unread"
 `
 
-func (q *Queries) MarkRead(ctx context.Context, id int64) error {
-	_, err := q.db.ExecContext(ctx, markRead, id)
+func (q *Queries) MarkAllItemsAsRead(ctx context.Context) error {
+	_, err := q.db.ExecContext(ctx, markAllItemsAsRead)
+	return err
+}
+
+const updateItemStatus = `-- name: UpdateItemStatus :exec
+UPDATE items SET status = ? WHERE id = ?
+`
+
+type UpdateItemStatusParams struct {
+	Status Status
+	ID     int64
+}
+
+func (q *Queries) UpdateItemStatus(ctx context.Context, arg UpdateItemStatusParams) error {
+	_, err := q.db.ExecContext(ctx, updateItemStatus, arg.Status, arg.ID)
 	return err
 }

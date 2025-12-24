@@ -1,14 +1,14 @@
 package server
 
 import (
-	"context"
 	"database/sql"
 	"fmt"
-	"log/slog"
 	"net/http"
+	"slices"
 	"strconv"
 
 	"github.com/ethansaxenian/rss/components"
+	"github.com/ethansaxenian/rss/contextkeys"
 	"github.com/ethansaxenian/rss/database"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -26,52 +26,139 @@ func (s *Server) NewRouter() chi.Router {
 	r.Use(middleware.Recoverer)
 	r.Use(cors.Handler(cors.Options{AllowedOrigins: []string{"*"}}))
 	r.Use(middleware.RedirectSlashes)
+	r.Use(middleware.NoCache)
 
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/unread", http.StatusMovedPermanently)
 	})
 
-	r.Get("/unread", s.Handle(unread))
-	r.Post("/items/{id:^[0-9]+}/read", s.Handle(readItem))
+	r.Get("/unread", s.Handle(s.unreadPage))
+	r.Get("/unread/list", s.Handle(s.unreadList))
+	r.Get("/history", s.Handle(s.historyPage))
+	r.Get("/history/list", s.Handle(s.historyList))
+	r.Get("/feeds", s.Handle(s.feedsPage))
+	r.Post("/feeds/refresh", s.Handle(s.refreshFeeds))
+	r.Put("/items/{id:^[0-9]+}/status", s.Handle(s.status))
+	r.Post("/items/read-all", s.Handle(s.readAll))
 
 	return r
 }
 
-func unread(ctx context.Context, log *slog.Logger, conn *sql.Conn, w http.ResponseWriter, r *http.Request) error {
+func (s *Server) unreadPage(conn *sql.Conn, w http.ResponseWriter, r *http.Request) error {
+	ctx := r.Context()
+
+	q := database.New(conn)
+	count, err := q.CountItems(ctx, database.StatusUnread)
+	if err != nil {
+		return fmt.Errorf("counting unread items: %w", err)
+	}
+
+	w.WriteHeader(http.StatusOK)
+	return components.UnreadPage(count).Render(ctx, w)
+}
+
+func (s *Server) historyPage(conn *sql.Conn, w http.ResponseWriter, r *http.Request) error {
+	ctx := r.Context()
+
+	q := database.New(conn)
+	count, err := q.CountItems(ctx, database.StatusRead)
+	if err != nil {
+		return fmt.Errorf("counting read items: %w", err)
+	}
+
+	w.WriteHeader(http.StatusOK)
+	return components.HistoryPage(count).Render(ctx, w)
+}
+
+func (s *Server) listItems(conn *sql.Conn, w http.ResponseWriter, r *http.Request, status database.Status) error {
+	ctx := r.Context()
+
 	query := r.URL.Query()
 	page, err := strconv.Atoi(query.Get("page"))
 	if err != nil {
-		log.Warn("Unable to parse page", "page", query.Get("page"))
+		page = 0
 	}
 
 	q := database.New(conn)
-	items, err := q.ListUnread(
+	items, err := q.ListItems(
 		ctx,
-		database.ListUnreadParams{
+		database.ListItemsParams{
+			Status: status,
 			Limit:  defaultPageSize,
 			Offset: int64(page) * defaultPageSize,
 		},
 	)
 	if err != nil {
-		return fmt.Errorf("listing unread items: %w", err)
+		return fmt.Errorf("listing %s items: %w", status, err)
 	}
 
+	ctx = contextkeys.WithRoutePathCtx(r.Context(), r.URL.Path)
+
 	w.WriteHeader(http.StatusOK)
-	return components.UnreadPage(items, page).Render(ctx, w)
+	return components.ItemsList(items, page).Render(ctx, w)
 }
 
-func readItem(ctx context.Context, log *slog.Logger, conn *sql.Conn, w http.ResponseWriter, r *http.Request) error {
+func (s *Server) unreadList(conn *sql.Conn, w http.ResponseWriter, r *http.Request) error {
+	return s.listItems(conn, w, r, database.StatusUnread)
+}
+
+func (s *Server) historyList(conn *sql.Conn, w http.ResponseWriter, r *http.Request) error {
+	return s.listItems(conn, w, r, database.StatusRead)
+}
+
+func (s *Server) status(conn *sql.Conn, w http.ResponseWriter, r *http.Request) error {
+	ctx := r.Context()
+
 	id, err := strconv.Atoi(chi.URLParam(r, "id"))
 	if err != nil {
 		return NewAPIError(http.StatusBadRequest, fmt.Errorf("parsing item ID: %w", err))
 	}
 
+	query := r.URL.Query()
+	status := database.Status(query.Get("status"))
+
+	if !slices.Contains(database.AllStatusValues(), status) {
+		return NewAPIError(http.StatusBadRequest, fmt.Errorf("unknown status: %s", status)) //nolint:err113
+	}
+
 	q := database.New(conn)
-	err = q.MarkRead(ctx, int64(id))
+	err = q.UpdateItemStatus(ctx, database.UpdateItemStatusParams{Status: status, ID: int64(id)})
 	if err != nil {
 		return fmt.Errorf("updating item status: %w", err)
 	}
 
+	w.WriteHeader(http.StatusOK)
+	return nil
+}
+
+func (s *Server) feedsPage(conn *sql.Conn, w http.ResponseWriter, r *http.Request) error {
+	ctx := r.Context()
+
+	q := database.New(conn)
+	feeds, err := q.ListFeeds(ctx)
+	if err != nil {
+		return fmt.Errorf("listing feeds: %w", err)
+	}
+
+	w.WriteHeader(http.StatusOK)
+	return components.FeedsPage(feeds).Render(ctx, w)
+}
+
+func (s *Server) readAll(conn *sql.Conn, w http.ResponseWriter, r *http.Request) error {
+	ctx := r.Context()
+
+	q := database.New(conn)
+	err := q.MarkAllItemsAsRead(ctx)
+	if err != nil {
+		return fmt.Errorf("marking items as read: %w", err)
+	}
+
+	http.Redirect(w, r, "/unread", http.StatusFound)
+	return nil
+}
+
+func (s *Server) refreshFeeds(conn *sql.Conn, w http.ResponseWriter, r *http.Request) error {
+	s.worker.ForceRefresh()
 	w.WriteHeader(http.StatusOK)
 	return nil
 }

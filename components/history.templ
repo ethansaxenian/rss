@@ -1,0 +1,15 @@
+package components
+
+templ HistoryPage(count int64) {
+	@base() {
+		<div class="flex flex-col items-center w-full">
+			<h1 class="text-3xl mb-5">History ({ count })</h1>
+			<span
+				hx-get="/history/list"
+				hx-target="this"
+				hx-swap="outerHTML"
+				hx-trigger="load"
+			></span>
+		</div>
+	}
+}

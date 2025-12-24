@@ -1,0 +1,56 @@
+package components
+
+import (
+	"github.com/ethansaxenian/rss/database"
+	"fmt"
+	"github.com/ethansaxenian/rss/contextkeys"
+)
+
+templ ItemsList(items []database.ListItemsRow, page int) {
+	<span
+		class="flex flex-col items-center w-full"
+	>
+		for i, it := range items {
+			@item(it, page, i == len(items)-1)
+		}
+	</span>
+}
+
+templ item(item database.ListItemsRow, page int, lastItem bool) {
+	<div
+		class="rounded-md m-2 p-2 bg-zinc-800 border border-gray-500 flex flex-col w-full md:w-200 max-w-full"
+		if lastItem {
+			hx-get={ fmt.Sprintf("%s?page=%d", contextkeys.GetRoutePathCtx(ctx), page+1) }
+			hx-trigger="intersect once"
+			hx-swap="afterend"
+		}
+	>
+		<a class="text-lg hover:text-white w-fit" href={ templ.SafeURL(item.Link) } target="_blank">{ item.Title }</a>
+		<span class="text-sm">
+			{ item.Feed.Title } | { item.PublishedAt.Format("Jan _2") } |
+			<span>
+				@markAs(item)
+			</span>
+		</span>
+	</div>
+}
+
+templ markAs(item database.ListItemsRow) {
+	{{
+		var nextStatus database.Status
+		switch item.Status {
+		case database.StatusRead:
+			nextStatus = database.StatusUnread
+		case database.StatusUnread:
+			nextStatus = database.StatusRead
+		}
+	}}
+	<span
+		class="hover:text-zinc-500 hover:cursor-pointer"
+		hx-put={ fmt.Sprintf("/items/%d/status?status=%v", item.ID, nextStatus) }
+		hx-target="closest article"
+		hx-swap="outerHTML swap"
+	>
+		Mark as { nextStatus }
+	</span>
+}

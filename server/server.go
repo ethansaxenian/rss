@@ -7,6 +7,9 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"os"
+
+	"github.com/ethansaxenian/rss/worker"
 )
 
 type Server struct {
@@ -14,6 +17,7 @@ type Server struct {
 	port   int
 	server *http.Server
 	log    *slog.Logger
+	worker *worker.Worker
 }
 
 func (s *Server) Close() error {
@@ -36,11 +40,12 @@ func (s *Server) ListenAndServe() error {
 	return nil
 }
 
-func New(ctx context.Context, port int, db *sql.DB) (*Server, error) {
+func New(ctx context.Context, port int, db *sql.DB, worker *worker.Worker) (*Server, error) {
 	s := &Server{
-		db:   db,
-		port: port,
-		log:  slog.With("api:"),
+		db:     db,
+		port:   port,
+		log:    slog.New(slog.NewTextHandler(os.Stdout, nil)),
+		worker: worker,
 	}
 
 	server := &http.Server{

@@ -6,6 +6,7 @@ import (
 	"log"
 
 	"github.com/ethansaxenian/rss/server"
+	"github.com/ethansaxenian/rss/worker"
 	_ "modernc.org/sqlite"
 )
 
@@ -22,13 +23,14 @@ func main() {
 		log.Fatalf("opening db: %v", err)
 	}
 
-	server, err := server.New(ctx, cfg.port, db)
+	w := worker.New(db)
+	go w.RunLoop(ctx)
+
+	server, err := server.New(ctx, cfg.port, db, w)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer server.Close() //nolint:errcheck
-
-	// go refreshLoop(ctx, db)
 
 	if err := server.ListenAndServe(); err != nil {
 		log.Fatal(err)

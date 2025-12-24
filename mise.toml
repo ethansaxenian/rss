@@ -14,7 +14,7 @@ run = "go build -o ./bin/main"
 depends = ["build"]
 run = "./bin/main"
 
-[tasks.live-server]
+[tasks.'dev:server']
 run = '''
 air \
   --build.cmd "go build -o ./bin/main" \
@@ -24,13 +24,21 @@ air \
   --build.exclude_unchanged "true"
 '''
 
-[tasks.live-templ]
-run = 'templ generate --watch --proxy="http://localhost:{{env.SERVER_PORT}}" --open-browser=true -v'
+[tasks.'dev:templ']
+run = 'go tool templ generate --watch --proxy="http://localhost:{{env.SERVER_PORT}}" --open-browser=true'
+
+[tasks.'dev:sqlc']
+run = '''
+air \
+  --build.cmd "go tool sqlc generate" \
+  --build.bin true \
+  --build.include_dir "queries" \
+  --build.include_ext "sql" \
+  --build.delay 100
+'''
 
 [tasks.dev]
-run = [
-  {tasks = ['live-server', 'live-templ']}
-]
+depends = ["dev*"]
 
 [tasks.migrate]
 run =	"go tool goose up"

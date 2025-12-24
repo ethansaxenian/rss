@@ -1,4 +1,4 @@
-package main
+package worker
 
 import (
 	"context"
@@ -12,21 +12,41 @@ import (
 )
 
 const (
-	refreshLoopInterval    = 60 * time.Minute
-	maxConcurrentRefreshes = 5
-	feedRefreshTimeout     = 15 * time.Second
+	refreshLoopInterval     = 60 * time.Minute
+	maxConcurrentRefreshes  = 5
+	feedRefreshTimeout      = 15 * time.Second
+	refreshThrottleInverval = 10 * time.Minute
 )
 
-func refreshLoop(ctx context.Context, db *sql.DB) {
+type Worker struct {
+	db          *sql.DB
+	triggerChan chan struct{}
+}
+
+func New(db *sql.DB) *Worker {
+	return &Worker{
+		db:          db,
+		triggerChan: make(chan struct{}, 1),
+	}
+}
+
+func (w *Worker) ForceRefresh() {
+	w.triggerChan <- struct{}{}
+}
+
+func (w *Worker) RunLoop(ctx context.Context) {
 	ticker := time.Tick(refreshLoopInterval)
 
 	for {
-		if err := refreshFeeds(ctx, db); err != nil {
-			slog.Error("Error refreshing feeds", "error", err)
-		}
 		select {
 		case <-ticker:
-			continue
+			if err := w.refreshFeeds(ctx, false); err != nil {
+				slog.Error("Error refreshing feeds", "error", err)
+			}
+		case <-w.triggerChan:
+			if err := w.refreshFeeds(ctx, true); err != nil {
+				slog.Error("Error refreshing feeds", "error", err)
+			}
 		case <-ctx.Done():
 			slog.Info("Context cancelled, exiting.")
 			return
@@ -34,13 +54,17 @@ func refreshLoop(ctx context.Context, db *sql.DB) {
 	}
 }
 
-func refreshFeeds(ctx context.Context, db *sql.DB) error {
-	slog.Info("Starting feed refresh.", "next_refresh", time.Now().Add(refreshLoopInterval))
+func (w *Worker) refreshFeeds(ctx context.Context, force bool) error {
+	if force {
+		slog.Info("Starting feed refresh.", "forced", true)
+	} else {
+		slog.Info("Starting feed refresh.", "forced", false, "next_refresh", time.Now().UTC().Add(refreshLoopInterval))
+	}
 
 	var eg errgroup.Group
 	eg.SetLimit(maxConcurrentRefreshes)
 
-	q := database.New(db)
+	q := database.New(w.db)
 	feeds, err := q.ListFeeds(ctx)
 	if err != nil {
 		return fmt.Errorf("listing feeds: %w", err)
@@ -52,7 +76,7 @@ func refreshFeeds(ctx context.Context, db *sql.DB) error {
 		eg.Go(func() error {
 			feedCtx, cancel := context.WithTimeout(ctx, feedRefreshTimeout)
 			defer cancel()
-			return refreshFeed(feedCtx, db, feed)
+			return refreshFeed(feedCtx, w.db, feed)
 		})
 	}
 
@@ -64,7 +88,15 @@ func refreshFeeds(ctx context.Context, db *sql.DB) error {
 }
 
 func refreshFeed(ctx context.Context, db *sql.DB, feed database.Feed) error {
-	logger := slog.With("id", feed.ID, "url", feed.URL)
+	logger := slog.With("feed_id", feed.ID, "url", feed.URL)
+
+	now := time.Now().UTC()
+
+	if feed.LastRefreshedAt != nil && feed.LastRefreshedAt.Add(refreshThrottleInverval).After(now) {
+		logger.Warn("Refresh triggered too quickly. Try again later.", "can_refresh_at", feed.LastRefreshedAt.Add(refreshThrottleInverval))
+		return nil
+	}
+
 	logger.Info("Refreshing feed.")
 
 	res, err := fetchFeed(ctx, feed.URL)
