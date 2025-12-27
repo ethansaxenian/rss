@@ -30,7 +30,12 @@ templ item(row database.ListItemsRow, page int, lastItem bool) {
 			hx-swap="afterend"
 		}
 	>
-		<a class="text-lg hover:text-white w-fit mb-1" href={ templ.SafeURL(item.Link) } target="_blank">{ item.Title }</a>
+		<span class="flex items-start">
+			if feed.Image != nil {
+				<img class="h-7 mr-2" src={ *feed.Image }/>
+			}
+			<a class="text-lg hover:text-white w-fit mb-1" href={ templ.SafeURL(item.Link) } target="_blank">{ item.Title }</a>
+		</span>
 		<span class="text-sm">
 			<span>
 				@feedTitle(feed)

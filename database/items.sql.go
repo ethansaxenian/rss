@@ -59,7 +59,7 @@ func (q *Queries) CreateItem(ctx context.Context, arg CreateItemParams) error {
 }
 
 const listItems = `-- name: ListItems :many
-SELECT items.id, items.feed_id, items.title, items.link, items.description, items.status, items.published_at, items.created_at, items.updated_at, feeds.id, feeds.title, feeds.url, feeds.created_at, feeds.updated_at, feeds.last_refreshed_at FROM items
+SELECT items.id, items.feed_id, items.title, items.link, items.description, items.status, items.published_at, items.created_at, items.updated_at, feeds.id, feeds.title, feeds.url, feeds.created_at, feeds.updated_at, feeds.last_refreshed_at, feeds.image FROM items
 JOIN feeds ON items.feed_id = feeds.id
 WHERE (CAST (? AS BOOL)  = 0 OR items.status  = ?)
 AND   (CAST (? AS BOOL) = 0 OR items.feed_id = ?)
@@ -113,6 +113,7 @@ func (q *Queries) ListItems(ctx context.Context, arg ListItemsParams) ([]ListIte
 			&i.Feed.CreatedAt,
 			&i.Feed.UpdatedAt,
 			&i.Feed.LastRefreshedAt,
+			&i.Feed.Image,
 		); err != nil {
 			return nil, err
 		}

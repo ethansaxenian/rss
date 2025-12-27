@@ -15,6 +15,7 @@ type Feed struct {
 	CreatedAt       time.Time
 	UpdatedAt       *time.Time
 	LastRefreshedAt *time.Time
+	Image           *string
 }
 
 type Item struct {

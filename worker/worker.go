@@ -5,10 +5,12 @@ import (
 	"database/sql"
 	"fmt"
 	"log/slog"
+	"sort"
 	"sync"
 	"time"
 
 	"github.com/ethansaxenian/rss/database"
+	"github.com/mmcdole/gofeed"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -21,9 +23,9 @@ const (
 
 type Worker struct {
 	db          *sql.DB
+	dbMu        sync.Mutex
 	triggerChan chan struct{}
 	log         *slog.Logger
-	writeMu     sync.Mutex
 }
 
 func New(db *sql.DB, logger *slog.Logger) *Worker {
@@ -107,13 +109,13 @@ func (w *Worker) refreshFeed(ctx context.Context, feed database.Feed) error {
 
 	logger.Info("Refreshing feed.")
 
-	res, err := fetchFeed(ctx, feed.URL)
+	res, err := gofeed.NewParser().ParseURLWithContext(feed.URL, ctx)
 	if err != nil {
-		return fmt.Errorf("fetching feed: %w", err)
+		return fmt.Errorf("parsing feed URL: %w", err)
 	}
 
-	w.writeMu.Lock()
-	defer w.writeMu.Unlock()
+	w.dbMu.Lock()
+	defer w.dbMu.Unlock()
 
 	tx, err := w.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -123,7 +125,7 @@ func (w *Worker) refreshFeed(ctx context.Context, feed database.Feed) error {
 
 	q := database.New(w.db).WithTx(tx)
 
-	var newItems int
+	var numNewItems int
 	for _, item := range res.Items {
 		if feed.LastRefreshedAt != nil && item.PublishedParsed.Before(*feed.LastRefreshedAt) {
 			continue
@@ -142,18 +144,24 @@ func (w *Worker) refreshFeed(ctx context.Context, feed database.Feed) error {
 			return fmt.Errorf("creating item: %w", err)
 		}
 
-		newItems++
+		numNewItems++
+	}
+
+	if res.Image != nil {
+		if err := q.UpdateFeedImage(ctx, database.UpdateFeedImageParams{Image: &res.Image.URL, ID: feed.ID}); err != nil {
+			logger.Error("Failed to update feeds.image.")
+		}
 	}
 
 	if err := q.UpdateFeedLastRefreshedAt(ctx, feed.ID); err != nil {
-		logger.Error("Failed to update last_refreshed_at.")
+		logger.Error("Failed to update feeds.last_refreshed_at.")
 	}
 
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("committing transaction: %w", err)
 	}
 
-	logger.Info("Successfully refreshed feed.", "new_items", newItems)
+	logger.Info("Successfully refreshed feed.", "new_items", numNewItems)
 
 	return nil
 }

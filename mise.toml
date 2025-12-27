@@ -1,9 +1,9 @@
 [env]
-DATABASE_DSN = "./rss.db"
+DATABASE_URL = "./rss.db"
 SERVER_PORT = 3000
 GOOSE_MIGRATION_DIR = "./database/migrations"
 GOOSE_DRIVER = "sqlite3"
-GOOSE_DBSTRING = "{{env.DATABASE_DSN}}"
+GOOSE_DBSTRING = "{{env.DATABASE_URL}}"
 
 [tasks.build]
 depends = ["sqlc", "templ"]

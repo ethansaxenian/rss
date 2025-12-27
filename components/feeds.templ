@@ -26,16 +26,21 @@ templ feedsList(feeds []database.Feed) {
 }
 
 templ feed(feed database.Feed) {
-	<article class="rounded-md m-2 p-2 bg-zinc-800 border border-gray-500 flex flex-col w-full md:w-200 max-w-full">
-		<span
-			class="text-lg hover:text-white w-fit hover:cursor-pointer"
-			hx-get={ fmt.Sprintf("/feeds/%d", feed.ID) }
-			hx-target="#container"
-			hx-push-url="true"
-		>
-			{ feed.Title }
+	<div class="rounded-md m-2 p-2 bg-zinc-800 border border-gray-500 flex flex-col w-full md:w-200 max-w-full">
+		<span class="flex items-start">
+			if feed.Image != nil {
+				<img class="h-7 mr-2" src={ *feed.Image }/>
+			}
+			<span
+				class="text-lg hover:text-white w-fit hover:cursor-pointer"
+				hx-get={ fmt.Sprintf("/feeds/%d", feed.ID) }
+				hx-target="#container"
+				hx-push-url="true"
+			>
+				{ feed.Title }
+			</span>
 		</span>
-	</article>
+	</div>
 }
 
 templ refreshAll() {

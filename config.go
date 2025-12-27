@@ -17,9 +17,9 @@ func getConfig() (config, error) {
 		return config{}, fmt.Errorf("parsing SERVER_PORT: %w", err)
 	}
 
-	dsn, ok := os.LookupEnv("DATABASE_DSN")
+	dsn, ok := os.LookupEnv("DATABASE_URL")
 	if !ok {
-		return config{}, fmt.Errorf("empty DATABASE_DSN")
+		return config{}, fmt.Errorf("empty DATABASE_URL")
 	}
 
 	c := config{

@@ -70,7 +70,7 @@ func header() templ.Component {
 			templ_7745c5c3_Var2 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "<header><nav class=\"flex justify-center gap-5 p-5\"><span class=\"font-semibold hover:text-white hover:cursor-pointer\" hx-get=\"/unread\" hx-target=\"#container\" hx-push-url=\"true\">Unread</span> <span class=\"font-semibold hover:text-white hover:cursor-pointer\" hx-get=\"/history\" hx-target=\"#container\" hx-push-url=\"true\">History</span> <span class=\"font-semibold hover:text-white hover:cursor-pointer\" hx-get=\"/feeds\" hx-target=\"#container\" hx-push-url=\"true\">Feeds</span></nav></header>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "<header><nav class=\"flex justify-center gap-5 p-5\"><span class=\"font-semibold hover:text-white hover:cursor-pointer\" hx-get=\"/unread\" hx-target=\"#container\" hx-push-url=\"true\" hx-trigger=\"click, keyup[key=='u'] from:body\">Unread</span> <span class=\"font-semibold hover:text-white hover:cursor-pointer\" hx-get=\"/history\" hx-target=\"#container\" hx-push-url=\"true\" hx-trigger=\"click, keyup[key=='h'] from:body\">History</span> <span class=\"font-semibold hover:text-white hover:cursor-pointer\" hx-get=\"/feeds\" hx-target=\"#container\" hx-push-url=\"true\" hx-trigger=\"click, keyup[key=='f'] from:body\">Feeds</span></nav></header>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

@@ -24,6 +24,7 @@ templ header() {
 				hx-get="/unread"
 				hx-target="#container"
 				hx-push-url="true"
+				hx-trigger="click, keyup[key=='u'] from:body"
 			>
 				Unread
 			</span>
@@ -32,6 +33,7 @@ templ header() {
 				hx-get="/history"
 				hx-target="#container"
 				hx-push-url="true"
+				hx-trigger="click, keyup[key=='h'] from:body"
 			>
 				History
 			</span>
@@ -40,6 +42,7 @@ templ header() {
 				hx-get="/feeds"
 				hx-target="#container"
 				hx-push-url="true"
+				hx-trigger="click, keyup[key=='f'] from:body"
 			>
 				Feeds
 			</span>

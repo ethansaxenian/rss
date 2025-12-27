@@ -24,7 +24,7 @@ func (q *Queries) CreateFeed(ctx context.Context, arg CreateFeedParams) error {
 }
 
 const getFeed = `-- name: GetFeed :one
-SELECT id, title, url, created_at, updated_at, last_refreshed_at FROM feeds WHERE id = ?
+SELECT id, title, url, created_at, updated_at, last_refreshed_at, image FROM feeds WHERE id = ?
 `
 
 func (q *Queries) GetFeed(ctx context.Context, id int64) (Feed, error) {
@@ -37,12 +37,13 @@ func (q *Queries) GetFeed(ctx context.Context, id int64) (Feed, error) {
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.LastRefreshedAt,
+		&i.Image,
 	)
 	return i, err
 }
 
 const listFeeds = `-- name: ListFeeds :many
-SELECT id, title, url, created_at, updated_at, last_refreshed_at FROM feeds ORDER BY created_at DESC
+SELECT id, title, url, created_at, updated_at, last_refreshed_at, image FROM feeds ORDER BY created_at DESC
 `
 
 func (q *Queries) ListFeeds(ctx context.Context) ([]Feed, error) {
@@ -61,6 +62,7 @@ func (q *Queries) ListFeeds(ctx context.Context) ([]Feed, error) {
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.LastRefreshedAt,
+			&i.Image,
 		); err != nil {
 			return nil, err
 		}
@@ -73,6 +75,20 @@ func (q *Queries) ListFeeds(ctx context.Context) ([]Feed, error) {
 		return nil, err
 	}
 	return items, nil
+}
+
+const updateFeedImage = `-- name: UpdateFeedImage :exec
+UPDATE feeds SET image = ? WHERE id = ?
+`
+
+type UpdateFeedImageParams struct {
+	Image *string
+	ID    int64
+}
+
+func (q *Queries) UpdateFeedImage(ctx context.Context, arg UpdateFeedImageParams) error {
+	_, err := q.db.ExecContext(ctx, updateFeedImage, arg.Image, arg.ID)
+	return err
 }
 
 const updateFeedLastRefreshedAt = `-- name: UpdateFeedLastRefreshedAt :exec
