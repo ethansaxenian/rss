@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"log"
+	"log/slog"
+	"os"
 
 	"github.com/ethansaxenian/rss/server"
 	"github.com/ethansaxenian/rss/worker"
@@ -23,13 +25,12 @@ func main() {
 		log.Fatalf("opening db: %v", err)
 	}
 
-	w := worker.New(db)
+	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
+
+	w := worker.New(db, logger)
 	go w.RunLoop(ctx)
 
-	server, err := server.New(ctx, cfg.port, db, w)
-	if err != nil {
-		log.Fatal(err)
-	}
+	server := server.New(ctx, cfg.port, db, w, logger)
 	defer server.Close() //nolint:errcheck
 
 	if err := server.ListenAndServe(); err != nil {

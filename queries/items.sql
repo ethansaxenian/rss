@@ -2,17 +2,20 @@
 INSERT INTO items(feed_id, title, link, description, published_at) VALUES (?, ?, ?, ?, ?);
 
 -- name: ListItems :many
-SELECT items.*, sqlc.embed(feeds) FROM items
+SELECT sqlc.embed(items), sqlc.embed(feeds) FROM items
 JOIN feeds ON items.feed_id = feeds.id
-WHERE items.status = ?
+WHERE (CAST (@has_status AS BOOL)  = 0 OR items.status  = @status)
+AND   (CAST (@has_feed_id AS BOOL) = 0 OR items.feed_id = @feed_id)
 ORDER BY items.published_at DESC
 LIMIT ? OFFSET ?;
 
 -- name: CountItems :one
-SELECT COUNT(*) FROM items WHERE items.status = ?;
+SELECT COUNT(*) FROM items
+WHERE (CAST (@has_status AS BOOL)  = 0 OR items.status  = @status)
+AND   (CAST (@has_feed_id AS BOOL) = 0 OR items.feed_id = @feed_id);
 
--- name: UpdateItemStatus :exec
-UPDATE items SET status = ? WHERE id = ?;
+-- name: UpdateItemStatus :one
+UPDATE items SET status = ? WHERE id = ? RETURNING *;
 
 -- name: MarkAllItemsAsRead :exec
 UPDATE items SET status = "read" WHERE status = "unread";

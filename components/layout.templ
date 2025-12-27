@@ -9,8 +9,40 @@ templ base() {
 			<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
 			<script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.8/dist/htmx.min.js" integrity="sha384-/TgkGk7p307TH7EXJDuUlgG3Ce1UVolAOFopFekQkkXihi5u/6OCvVKyz1W+idaz" crossorigin="anonymous"></script>
 		</head>
-		<body id="container" class="bg-zinc-900 text-zinc-300 py-10 px-1">
+		<body id="container" class="bg-zinc-900 text-zinc-300">
+			@header()
 			{ children... }
 		</body>
 	</html>
+}
+
+templ header() {
+	<header>
+		<nav class="flex justify-center gap-5 p-5">
+			<span
+				class="font-semibold hover:text-white hover:cursor-pointer"
+				hx-get="/unread"
+				hx-target="#container"
+				hx-push-url="true"
+			>
+				Unread
+			</span>
+			<span
+				class="font-semibold hover:text-white hover:cursor-pointer"
+				hx-get="/history"
+				hx-target="#container"
+				hx-push-url="true"
+			>
+				History
+			</span>
+			<span
+				class="font-semibold hover:text-white hover:cursor-pointer"
+				hx-get="/feeds"
+				hx-target="#container"
+				hx-push-url="true"
+			>
+				Feeds
+			</span>
+		</nav>
+	</header>
 }

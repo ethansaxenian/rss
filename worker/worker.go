@@ -21,12 +21,14 @@ const (
 type Worker struct {
 	db          *sql.DB
 	triggerChan chan struct{}
+	log         *slog.Logger
 }
 
-func New(db *sql.DB) *Worker {
+func New(db *sql.DB, logger *slog.Logger) *Worker {
 	return &Worker{
 		db:          db,
 		triggerChan: make(chan struct{}, 1),
+		log:         logger,
 	}
 }
 
@@ -35,20 +37,21 @@ func (w *Worker) ForceRefresh() {
 }
 
 func (w *Worker) RunLoop(ctx context.Context) {
+	w.log.Info("Starting worker")
 	ticker := time.Tick(refreshLoopInterval)
 
 	for {
 		select {
 		case <-ticker:
 			if err := w.refreshFeeds(ctx, false); err != nil {
-				slog.Error("Error refreshing feeds", "error", err)
+				w.log.Error("Error refreshing feeds", "error", err)
 			}
 		case <-w.triggerChan:
 			if err := w.refreshFeeds(ctx, true); err != nil {
-				slog.Error("Error refreshing feeds", "error", err)
+				w.log.Error("Error refreshing feeds", "error", err)
 			}
 		case <-ctx.Done():
-			slog.Info("Context cancelled, exiting.")
+			w.log.Info("Context cancelled, exiting.")
 			return
 		}
 	}
@@ -56,9 +59,9 @@ func (w *Worker) RunLoop(ctx context.Context) {
 
 func (w *Worker) refreshFeeds(ctx context.Context, force bool) error {
 	if force {
-		slog.Info("Starting feed refresh.", "forced", true)
+		w.log.Info("Starting feed refresh.", "forced", true)
 	} else {
-		slog.Info("Starting feed refresh.", "forced", false, "next_refresh", time.Now().UTC().Add(refreshLoopInterval))
+		w.log.Info("Starting feed refresh.", "forced", false, "next_refresh", time.Now().UTC().Add(refreshLoopInterval).Local())
 	}
 
 	var eg errgroup.Group
@@ -70,13 +73,13 @@ func (w *Worker) refreshFeeds(ctx context.Context, force bool) error {
 		return fmt.Errorf("listing feeds: %w", err)
 	}
 
-	slog.Info("Found feeds.", "num_feeds", len(feeds))
+	w.log.Info("Found feeds.", "num_feeds", len(feeds))
 
 	for _, feed := range feeds {
 		eg.Go(func() error {
 			feedCtx, cancel := context.WithTimeout(ctx, feedRefreshTimeout)
 			defer cancel()
-			return refreshFeed(feedCtx, w.db, feed)
+			return w.refreshFeed(feedCtx, feed)
 		})
 	}
 
@@ -87,13 +90,13 @@ func (w *Worker) refreshFeeds(ctx context.Context, force bool) error {
 	return nil
 }
 
-func refreshFeed(ctx context.Context, db *sql.DB, feed database.Feed) error {
-	logger := slog.With("feed_id", feed.ID, "url", feed.URL)
+func (w *Worker) refreshFeed(ctx context.Context, feed database.Feed) error {
+	logger := w.log.With("feed_id", feed.ID, "url", feed.URL)
 
 	now := time.Now().UTC()
 
 	if feed.LastRefreshedAt != nil && feed.LastRefreshedAt.Add(refreshThrottleInverval).After(now) {
-		logger.Warn("Refresh triggered too quickly. Try again later.", "can_refresh_at", feed.LastRefreshedAt.Add(refreshThrottleInverval))
+		logger.Warn("Refresh triggered too quickly. Try again later.", "can_refresh_at", feed.LastRefreshedAt.Add(refreshThrottleInverval).Local())
 		return nil
 	}
 
@@ -104,13 +107,13 @@ func refreshFeed(ctx context.Context, db *sql.DB, feed database.Feed) error {
 		return fmt.Errorf("fetching feed: %w", err)
 	}
 
-	tx, err := db.BeginTx(ctx, nil)
+	tx, err := w.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("starting transaction: %w", err)
 	}
 	defer tx.Rollback() //nolint:errcheck
 
-	q := database.New(db).WithTx(tx)
+	q := database.New(w.db).WithTx(tx)
 
 	var newItems int
 	for _, item := range res.Items {
@@ -125,7 +128,7 @@ func refreshFeed(ctx context.Context, db *sql.DB, feed database.Feed) error {
 				Title:       item.Title,
 				Link:        item.Link,
 				Description: item.Description,
-				PublishedAt: item.PubDate.Time,
+				PublishedAt: item.PubDate.UTC(), // Store as UTC
 			},
 		); err != nil {
 			return fmt.Errorf("creating item: %w", err)

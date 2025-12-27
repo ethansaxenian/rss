@@ -7,7 +7,6 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
-	"os"
 
 	"github.com/ethansaxenian/rss/worker"
 )
@@ -40,11 +39,11 @@ func (s *Server) ListenAndServe() error {
 	return nil
 }
 
-func New(ctx context.Context, port int, db *sql.DB, worker *worker.Worker) (*Server, error) {
+func New(ctx context.Context, port int, db *sql.DB, worker *worker.Worker, logger *slog.Logger) *Server {
 	s := &Server{
 		db:     db,
 		port:   port,
-		log:    slog.New(slog.NewTextHandler(os.Stdout, nil)),
+		log:    logger,
 		worker: worker,
 	}
 
@@ -58,5 +57,5 @@ func New(ctx context.Context, port int, db *sql.DB, worker *worker.Worker) (*Ser
 
 	s.server = server
 
-	return s, nil
+	return s
 }

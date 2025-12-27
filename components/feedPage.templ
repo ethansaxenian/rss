@@ -1,0 +1,20 @@
+package components
+
+import (
+	"github.com/ethansaxenian/rss/database"
+	"fmt"
+)
+
+templ FeedPage(feed database.Feed, count int64) {
+	@base() {
+		<div class="flex flex-col items-center w-full">
+			<h1 class="text-3xl mb-5">{ feed.Title } ({ count })</h1>
+			<span
+				hx-get={ fmt.Sprintf("/feeds/%d/list", feed.ID) }
+				hx-target="this"
+				hx-swap="outerHTML"
+				hx-trigger="load"
+			></span>
+		</div>
+	}
+}

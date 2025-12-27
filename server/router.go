@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	defaultPageSize = 5
+	defaultPageSize = 20
 )
 
 func (s *Server) NewRouter() chi.Router {
@@ -33,10 +33,12 @@ func (s *Server) NewRouter() chi.Router {
 	})
 
 	r.Get("/unread", s.Handle(s.unreadPage))
-	r.Get("/unread/list", s.Handle(s.unreadList))
+	r.Get("/unread/list", s.Handle(s.unreadItemList))
 	r.Get("/history", s.Handle(s.historyPage))
-	r.Get("/history/list", s.Handle(s.historyList))
+	r.Get("/history/list", s.Handle(s.historyItemList))
 	r.Get("/feeds", s.Handle(s.feedsPage))
+	r.Get("/feeds/{id:^[0-9]+}", s.Handle(s.feedPage))
+	r.Get("/feeds/{id:^[0-9]+}/list", s.Handle(s.feedItemList))
 	r.Post("/feeds/refresh", s.Handle(s.refreshFeeds))
 	r.Put("/items/{id:^[0-9]+}/status", s.Handle(s.status))
 	r.Post("/items/read-all", s.Handle(s.readAll))
@@ -48,7 +50,13 @@ func (s *Server) unreadPage(conn *sql.Conn, w http.ResponseWriter, r *http.Reque
 	ctx := r.Context()
 
 	q := database.New(conn)
-	count, err := q.CountItems(ctx, database.StatusUnread)
+	count, err := q.CountItems(
+		ctx,
+		database.CountItemsParams{
+			HasStatus: true,
+			Status:    database.StatusUnread,
+		},
+	)
 	if err != nil {
 		return fmt.Errorf("counting unread items: %w", err)
 	}
@@ -61,7 +69,13 @@ func (s *Server) historyPage(conn *sql.Conn, w http.ResponseWriter, r *http.Requ
 	ctx := r.Context()
 
 	q := database.New(conn)
-	count, err := q.CountItems(ctx, database.StatusRead)
+	count, err := q.CountItems(
+		ctx,
+		database.CountItemsParams{
+			HasStatus: true,
+			Status:    database.StatusRead,
+		},
+	)
 	if err != nil {
 		return fmt.Errorf("counting read items: %w", err)
 	}
@@ -70,7 +84,36 @@ func (s *Server) historyPage(conn *sql.Conn, w http.ResponseWriter, r *http.Requ
 	return components.HistoryPage(count).Render(ctx, w)
 }
 
-func (s *Server) listItems(conn *sql.Conn, w http.ResponseWriter, r *http.Request, status database.Status) error {
+func (s *Server) feedPage(conn *sql.Conn, w http.ResponseWriter, r *http.Request) error {
+	ctx := r.Context()
+
+	id, err := strconv.Atoi(chi.URLParam(r, "id"))
+	if err != nil {
+		return NewAPIError(http.StatusBadRequest, fmt.Errorf("parsing feed ID: %w", err))
+	}
+
+	q := database.New(conn)
+	feed, err := q.GetFeed(ctx, int64(id))
+	if err != nil {
+		return fmt.Errorf("getting feed: %w", err)
+	}
+
+	count, err := q.CountItems(
+		ctx,
+		database.CountItemsParams{
+			HasFeedID: true,
+			FeedID:    int64(id),
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("counting read items: %w", err)
+	}
+
+	w.WriteHeader(http.StatusOK)
+	return components.FeedPage(feed, count).Render(ctx, w)
+}
+
+func (s *Server) listItems(conn *sql.Conn, w http.ResponseWriter, r *http.Request, status database.Status, feedID int64) error {
 	ctx := r.Context()
 
 	query := r.URL.Query()
@@ -83,9 +126,12 @@ func (s *Server) listItems(conn *sql.Conn, w http.ResponseWriter, r *http.Reques
 	items, err := q.ListItems(
 		ctx,
 		database.ListItemsParams{
-			Status: status,
-			Limit:  defaultPageSize,
-			Offset: int64(page) * defaultPageSize,
+			HasStatus: status != database.StatusAny,
+			Status:    status,
+			HasFeedID: feedID != 0,
+			FeedID:    feedID,
+			Limit:     defaultPageSize,
+			Offset:    int64(page) * defaultPageSize,
 		},
 	)
 	if err != nil {
@@ -98,12 +144,21 @@ func (s *Server) listItems(conn *sql.Conn, w http.ResponseWriter, r *http.Reques
 	return components.ItemsList(items, page).Render(ctx, w)
 }
 
-func (s *Server) unreadList(conn *sql.Conn, w http.ResponseWriter, r *http.Request) error {
-	return s.listItems(conn, w, r, database.StatusUnread)
+func (s *Server) unreadItemList(conn *sql.Conn, w http.ResponseWriter, r *http.Request) error {
+	return s.listItems(conn, w, r, database.StatusUnread, 0)
 }
 
-func (s *Server) historyList(conn *sql.Conn, w http.ResponseWriter, r *http.Request) error {
-	return s.listItems(conn, w, r, database.StatusRead)
+func (s *Server) historyItemList(conn *sql.Conn, w http.ResponseWriter, r *http.Request) error {
+	return s.listItems(conn, w, r, database.StatusRead, 0)
+}
+
+func (s *Server) feedItemList(conn *sql.Conn, w http.ResponseWriter, r *http.Request) error {
+	id, err := strconv.Atoi(chi.URLParam(r, "id"))
+	if err != nil {
+		return NewAPIError(http.StatusBadRequest, fmt.Errorf("parsing feed ID: %w", err))
+	}
+
+	return s.listItems(conn, w, r, database.StatusAny, int64(id))
 }
 
 func (s *Server) status(conn *sql.Conn, w http.ResponseWriter, r *http.Request) error {
@@ -122,13 +177,13 @@ func (s *Server) status(conn *sql.Conn, w http.ResponseWriter, r *http.Request) 
 	}
 
 	q := database.New(conn)
-	err = q.UpdateItemStatus(ctx, database.UpdateItemStatusParams{Status: status, ID: int64(id)})
+	item, err := q.UpdateItemStatus(ctx, database.UpdateItemStatusParams{Status: status, ID: int64(id)})
 	if err != nil {
 		return fmt.Errorf("updating item status: %w", err)
 	}
 
 	w.WriteHeader(http.StatusOK)
-	return nil
+	return components.MarkAs(item).Render(ctx, w)
 }
 
 func (s *Server) feedsPage(conn *sql.Conn, w http.ResponseWriter, r *http.Request) error {

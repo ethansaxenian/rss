@@ -23,6 +23,24 @@ func (q *Queries) CreateFeed(ctx context.Context, arg CreateFeedParams) error {
 	return err
 }
 
+const getFeed = `-- name: GetFeed :one
+SELECT id, title, url, created_at, updated_at, last_refreshed_at FROM feeds WHERE id = ?
+`
+
+func (q *Queries) GetFeed(ctx context.Context, id int64) (Feed, error) {
+	row := q.db.QueryRowContext(ctx, getFeed, id)
+	var i Feed
+	err := row.Scan(
+		&i.ID,
+		&i.Title,
+		&i.URL,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.LastRefreshedAt,
+	)
+	return i, err
+}
+
 const listFeeds = `-- name: ListFeeds :many
 SELECT id, title, url, created_at, updated_at, last_refreshed_at FROM feeds ORDER BY created_at DESC
 `

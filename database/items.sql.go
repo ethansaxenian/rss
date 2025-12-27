@@ -11,11 +11,25 @@ import (
 )
 
 const countItems = `-- name: CountItems :one
-SELECT COUNT(*) FROM items WHERE items.status = ?
+SELECT COUNT(*) FROM items
+WHERE (CAST (?1 AS BOOL)  = 0 OR items.status  = ?2)
+AND   (CAST (?3 AS BOOL) = 0 OR items.feed_id = ?4)
 `
 
-func (q *Queries) CountItems(ctx context.Context, status Status) (int64, error) {
-	row := q.db.QueryRowContext(ctx, countItems, status)
+type CountItemsParams struct {
+	HasStatus bool
+	Status    Status
+	HasFeedID bool
+	FeedID    int64
+}
+
+func (q *Queries) CountItems(ctx context.Context, arg CountItemsParams) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countItems,
+		arg.HasStatus,
+		arg.Status,
+		arg.HasFeedID,
+		arg.FeedID,
+	)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -47,32 +61,35 @@ func (q *Queries) CreateItem(ctx context.Context, arg CreateItemParams) error {
 const listItems = `-- name: ListItems :many
 SELECT items.id, items.feed_id, items.title, items.link, items.description, items.status, items.published_at, items.created_at, items.updated_at, feeds.id, feeds.title, feeds.url, feeds.created_at, feeds.updated_at, feeds.last_refreshed_at FROM items
 JOIN feeds ON items.feed_id = feeds.id
-WHERE items.status = ?
+WHERE (CAST (? AS BOOL)  = 0 OR items.status  = ?)
+AND   (CAST (? AS BOOL) = 0 OR items.feed_id = ?)
 ORDER BY items.published_at DESC
 LIMIT ? OFFSET ?
 `
 
 type ListItemsParams struct {
-	Status Status
-	Limit  int64
-	Offset int64
+	HasStatus bool
+	Status    Status
+	HasFeedID bool
+	FeedID    int64
+	Limit     int64
+	Offset    int64
 }
 
 type ListItemsRow struct {
-	ID          int64
-	FeedID      int64
-	Title       string
-	Link        string
-	Description string
-	Status      Status
-	PublishedAt time.Time
-	CreatedAt   time.Time
-	UpdatedAt   *time.Time
-	Feed        Feed
+	Item Item
+	Feed Feed
 }
 
 func (q *Queries) ListItems(ctx context.Context, arg ListItemsParams) ([]ListItemsRow, error) {
-	rows, err := q.db.QueryContext(ctx, listItems, arg.Status, arg.Limit, arg.Offset)
+	rows, err := q.db.QueryContext(ctx, listItems,
+		arg.HasStatus,
+		arg.Status,
+		arg.HasFeedID,
+		arg.FeedID,
+		arg.Limit,
+		arg.Offset,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -81,15 +98,15 @@ func (q *Queries) ListItems(ctx context.Context, arg ListItemsParams) ([]ListIte
 	for rows.Next() {
 		var i ListItemsRow
 		if err := rows.Scan(
-			&i.ID,
-			&i.FeedID,
-			&i.Title,
-			&i.Link,
-			&i.Description,
-			&i.Status,
-			&i.PublishedAt,
-			&i.CreatedAt,
-			&i.UpdatedAt,
+			&i.Item.ID,
+			&i.Item.FeedID,
+			&i.Item.Title,
+			&i.Item.Link,
+			&i.Item.Description,
+			&i.Item.Status,
+			&i.Item.PublishedAt,
+			&i.Item.CreatedAt,
+			&i.Item.UpdatedAt,
 			&i.Feed.ID,
 			&i.Feed.Title,
 			&i.Feed.URL,
@@ -119,8 +136,8 @@ func (q *Queries) MarkAllItemsAsRead(ctx context.Context) error {
 	return err
 }
 
-const updateItemStatus = `-- name: UpdateItemStatus :exec
-UPDATE items SET status = ? WHERE id = ?
+const updateItemStatus = `-- name: UpdateItemStatus :one
+UPDATE items SET status = ? WHERE id = ? RETURNING id, feed_id, title, link, description, status, published_at, created_at, updated_at
 `
 
 type UpdateItemStatusParams struct {
@@ -128,7 +145,19 @@ type UpdateItemStatusParams struct {
 	ID     int64
 }
 
-func (q *Queries) UpdateItemStatus(ctx context.Context, arg UpdateItemStatusParams) error {
-	_, err := q.db.ExecContext(ctx, updateItemStatus, arg.Status, arg.ID)
-	return err
+func (q *Queries) UpdateItemStatus(ctx context.Context, arg UpdateItemStatusParams) (Item, error) {
+	row := q.db.QueryRowContext(ctx, updateItemStatus, arg.Status, arg.ID)
+	var i Item
+	err := row.Scan(
+		&i.ID,
+		&i.FeedID,
+		&i.Title,
+		&i.Link,
+		&i.Description,
+		&i.Status,
+		&i.PublishedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
 }

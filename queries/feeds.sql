@@ -1,3 +1,6 @@
+-- name: GetFeed :one
+SELECT * FROM feeds WHERE id = ?;
+
 -- name: ListFeeds :many
 SELECT * FROM feeds ORDER BY created_at DESC;
 
