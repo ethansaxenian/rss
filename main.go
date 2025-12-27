@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"os"
 
+	"github.com/ethansaxenian/rss/database"
 	"github.com/ethansaxenian/rss/server"
 	"github.com/ethansaxenian/rss/worker"
 	_ "modernc.org/sqlite"
@@ -26,6 +27,11 @@ func main() {
 	}
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
+
+	logger.Debug("Running migrations")
+	if err := database.Migrate(ctx, db); err != nil {
+		log.Fatalf("migrate: %v", err)
+	}
 
 	w := worker.New(db, logger)
 	go w.RunLoop(ctx)

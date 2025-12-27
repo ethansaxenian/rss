@@ -1,7 +1,7 @@
 [env]
 DATABASE_DSN = "./rss.db"
 SERVER_PORT = 3000
-GOOSE_MIGRATION_DIR = "./migrations"
+GOOSE_MIGRATION_DIR = "./database/migrations"
 GOOSE_DRIVER = "sqlite3"
 GOOSE_DBSTRING = "{{env.DATABASE_DSN}}"
 

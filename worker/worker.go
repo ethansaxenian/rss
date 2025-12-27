@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log/slog"
+	"sync"
 	"time"
 
 	"github.com/ethansaxenian/rss/database"
@@ -22,6 +23,7 @@ type Worker struct {
 	db          *sql.DB
 	triggerChan chan struct{}
 	log         *slog.Logger
+	writeMu     sync.Mutex
 }
 
 func New(db *sql.DB, logger *slog.Logger) *Worker {
@@ -79,7 +81,10 @@ func (w *Worker) refreshFeeds(ctx context.Context, force bool) error {
 		eg.Go(func() error {
 			feedCtx, cancel := context.WithTimeout(ctx, feedRefreshTimeout)
 			defer cancel()
-			return w.refreshFeed(feedCtx, feed)
+			if err = w.refreshFeed(feedCtx, feed); err != nil {
+				w.log.Error("Error refreshing feed", "feed_id", feed.ID, "url", feed.URL, "error", err)
+			}
+			return nil
 		})
 	}
 
@@ -107,6 +112,9 @@ func (w *Worker) refreshFeed(ctx context.Context, feed database.Feed) error {
 		return fmt.Errorf("fetching feed: %w", err)
 	}
 
+	w.writeMu.Lock()
+	defer w.writeMu.Unlock()
+
 	tx, err := w.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("starting transaction: %w", err)
@@ -117,7 +125,7 @@ func (w *Worker) refreshFeed(ctx context.Context, feed database.Feed) error {
 
 	var newItems int
 	for _, item := range res.Items {
-		if feed.LastRefreshedAt != nil && item.PubDate.Before(*feed.LastRefreshedAt) {
+		if feed.LastRefreshedAt != nil && item.PublishedParsed.Before(*feed.LastRefreshedAt) {
 			continue
 		}
 
@@ -128,7 +136,7 @@ func (w *Worker) refreshFeed(ctx context.Context, feed database.Feed) error {
 				Title:       item.Title,
 				Link:        item.Link,
 				Description: item.Description,
-				PublishedAt: item.PubDate.UTC(), // Store as UTC
+				PublishedAt: (*item.PublishedParsed).UTC(), // Store as UTC
 			},
 		); err != nil {
 			return fmt.Errorf("creating item: %w", err)
