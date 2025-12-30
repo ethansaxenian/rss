@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"fmt"
 	"log/slog"
-	"sort"
 	"sync"
 	"time"
 
@@ -24,20 +23,20 @@ const (
 type Worker struct {
 	db          *sql.DB
 	dbMu        sync.Mutex
-	triggerChan chan struct{}
+	refreshChan chan struct{}
 	log         *slog.Logger
 }
 
 func New(db *sql.DB, logger *slog.Logger) *Worker {
 	return &Worker{
 		db:          db,
-		triggerChan: make(chan struct{}, 1),
+		refreshChan: make(chan struct{}, 1),
 		log:         logger,
 	}
 }
 
-func (w *Worker) ForceRefresh() {
-	w.triggerChan <- struct{}{}
+func (w *Worker) RefreshAll() {
+	w.refreshChan <- struct{}{}
 }
 
 func (w *Worker) RunLoop(ctx context.Context) {
@@ -47,11 +46,11 @@ func (w *Worker) RunLoop(ctx context.Context) {
 	for {
 		select {
 		case <-ticker:
-			if err := w.refreshFeeds(ctx, false); err != nil {
+			if err := w.refreshFeeds(ctx); err != nil {
 				w.log.Error("Error refreshing feeds", "error", err)
 			}
-		case <-w.triggerChan:
-			if err := w.refreshFeeds(ctx, true); err != nil {
+		case <-w.refreshChan:
+			if err := w.refreshFeeds(ctx); err != nil {
 				w.log.Error("Error refreshing feeds", "error", err)
 			}
 		case <-ctx.Done():
@@ -61,13 +60,7 @@ func (w *Worker) RunLoop(ctx context.Context) {
 	}
 }
 
-func (w *Worker) refreshFeeds(ctx context.Context, force bool) error {
-	if force {
-		w.log.Info("Starting feed refresh.", "forced", true)
-	} else {
-		w.log.Info("Starting feed refresh.", "forced", false, "next_refresh", time.Now().UTC().Add(refreshLoopInterval).Local())
-	}
-
+func (w *Worker) refreshFeeds(ctx context.Context) error {
 	var eg errgroup.Group
 	eg.SetLimit(maxConcurrentRefreshes)
 
@@ -77,7 +70,7 @@ func (w *Worker) refreshFeeds(ctx context.Context, force bool) error {
 		return fmt.Errorf("listing feeds: %w", err)
 	}
 
-	w.log.Info("Found feeds.", "num_feeds", len(feeds))
+	w.log.Debug("Found feeds.", "num_feeds", len(feeds))
 
 	for _, feed := range feeds {
 		eg.Go(func() error {

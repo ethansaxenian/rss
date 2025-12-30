@@ -19,7 +19,7 @@ const (
 //go:embed migrations/*.sql
 var embedMigrations embed.FS
 
-func Migrate(ctx context.Context, db *sql.DB) error {
+func migrate(ctx context.Context, db *sql.DB) error {
 	migrations, err := fs.Sub(embedMigrations, "migrations")
 	if err != nil {
 		return fmt.Errorf("reading migrations dir: %w", err)

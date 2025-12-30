@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"database/sql"
 	"log"
 	"log/slog"
 	"os"
@@ -21,17 +20,12 @@ func main() {
 		log.Fatalf("getting config: %v", err)
 	}
 
-	db, err := sql.Open("sqlite", cfg.dsn)
+	db, err := database.Init(ctx, cfg.dsn)
 	if err != nil {
-		log.Fatalf("opening db: %v", err)
+		log.Fatalf("initializing db: %v", err)
 	}
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-
-	logger.Debug("Running migrations")
-	if err := database.Migrate(ctx, db); err != nil {
-		log.Fatalf("migrate: %v", err)
-	}
 
 	w := worker.New(db, logger)
 	go w.RunLoop(ctx)

@@ -213,7 +213,7 @@ func (s *Server) readAll(conn *sql.Conn, w http.ResponseWriter, r *http.Request)
 }
 
 func (s *Server) refreshFeeds(conn *sql.Conn, w http.ResponseWriter, r *http.Request) error {
-	s.worker.ForceRefresh()
+	s.worker.RefreshAll()
 	w.WriteHeader(http.StatusOK)
 	return nil
 }
