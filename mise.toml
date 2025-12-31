@@ -6,19 +6,23 @@ GOOSE_DRIVER = "sqlite3"
 GOOSE_DBSTRING = "{{env.DATABASE_URL}}"
 
 [tasks.build]
+description = "Build the app"
 depends = ["sqlc", "templ"]
 run = "go build -o ./bin/main"
 
 [tasks.build-linux]
+description = "Build the app for linux"
 env = { GOOS = "linux", GOARCH = "arm64", CGO_ENABLED = 0 }
 depends = ["sqlc", "templ"]
 run = "go build -o ./bin/main"
 
 [tasks.run]
+description = "Build and run the app"
 depends = ["build"]
 run = "./bin/main"
 
 [tasks."dev:server"]
+description = "Run the Go app with hot reloading"
 run = """
 air \
   --build.cmd "go build -o ./bin/main" \
@@ -29,9 +33,11 @@ air \
 """
 
 [tasks."dev:templ"]
+description = "Regenerate templ files on changes"
 run = "go tool templ generate --watch --proxy='http://localhost:{{env.SERVER_PORT}}' --open-browser=false"
 
 [tasks."dev:sqlc"]
+description = "Regenerate sqlc files on changes"
 run = """
 air \
   --build.cmd "go tool sqlc generate" \
@@ -43,24 +49,30 @@ air \
 """
 
 [tasks.dev]
+description = "Run the dev environment"
 depends = ["dev:*"]
 
 [tasks.migrate]
+description = "Migrate the database"
 run = "go tool goose up"
 
 [tasks.migrate-create]
+description = "Create a new migration file"
 usage = """
 arg "<name>"
 """
 run = "go tool goose create ${usage_name?} sql"
 
 [tasks.migrate-rollback]
+description = "Rollback the latest database migration"
 run = "go tool goose down"
 
 [tasks.sqlc]
+description = "Regenerate sqlc files"
 sources = ["database/queries/*.sql"]
 run = "go tool sqlc generate"
 
 [tasks.templ]
+description = "Regenerate templ files"
 sources = ["components/**/*.templ"]
 run = "go tool templ generate"

@@ -24,8 +24,16 @@ func Init(ctx context.Context, dsn string) (*sql.DB, error) {
 		return nil, fmt.Errorf("verifying DB connection: %w", err)
 	}
 
-	if _, err := db.ExecContext(ctx, "PRAGMA foreign_keys = ON;"); err != nil {
-		return nil, fmt.Errorf("enabling foreign keys: %w", err)
+	pragmas := []string{
+		"PRAGMA foreign_keys = ON;",
+		"PRAGMA journal_mode = wal;",
+		"PRAGMA synchronous = normal;",
+	}
+
+	for _, p := range pragmas {
+		if _, err := db.ExecContext(ctx, p); err != nil {
+			return nil, fmt.Errorf("enabling %s: %w", p, err)
+		}
 	}
 
 	if err := migrate(ctx, db); err != nil {
