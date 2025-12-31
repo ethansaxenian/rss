@@ -7,8 +7,8 @@ Built using Go, Templ, HTMX, and TailwindCSS.
 
 ### Requirements
 
-- [Go](https://go.dev/)
-- [Mise](https://mise.jdx.dev/)
+- [Go](https://go.dev/) (>=1.24 for `go tool` support)
+- [Mise](https://mise.jdx.dev/) (optional)
 
 ### Running the app
 
