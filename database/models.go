@@ -25,6 +25,7 @@ type Item struct {
 	Link        string
 	Description string
 	Status      Status
+	Hash        string
 	PublishedAt time.Time
 	CreatedAt   time.Time
 	UpdatedAt   *time.Time

@@ -10,6 +10,33 @@ import (
 	"time"
 )
 
+const checkItemExists = `-- name: CheckItemExists :one
+SELECT id, feed_id, title, link, description, status, hash, published_at, created_at, updated_at FROM items WHERE feed_id = ? AND hash = ?
+`
+
+type CheckItemExistsParams struct {
+	FeedID int64
+	Hash   string
+}
+
+func (q *Queries) CheckItemExists(ctx context.Context, arg CheckItemExistsParams) (Item, error) {
+	row := q.db.QueryRowContext(ctx, checkItemExists, arg.FeedID, arg.Hash)
+	var i Item
+	err := row.Scan(
+		&i.ID,
+		&i.FeedID,
+		&i.Title,
+		&i.Link,
+		&i.Description,
+		&i.Status,
+		&i.Hash,
+		&i.PublishedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const countItems = `-- name: CountItems :one
 SELECT COUNT(*) FROM items
 WHERE (CAST (?1 AS BOOL)  = 0 OR items.status  = ?2)
@@ -36,7 +63,7 @@ func (q *Queries) CountItems(ctx context.Context, arg CountItemsParams) (int64, 
 }
 
 const createItem = `-- name: CreateItem :exec
-INSERT INTO items(feed_id, title, link, description, published_at) VALUES (?, ?, ?, ?, ?)
+INSERT INTO items(feed_id, title, link, description, hash, published_at) VALUES (?, ?, ?, ?, ?, ?)
 `
 
 type CreateItemParams struct {
@@ -44,6 +71,7 @@ type CreateItemParams struct {
 	Title       string
 	Link        string
 	Description string
+	Hash        string
 	PublishedAt time.Time
 }
 
@@ -53,13 +81,14 @@ func (q *Queries) CreateItem(ctx context.Context, arg CreateItemParams) error {
 		arg.Title,
 		arg.Link,
 		arg.Description,
+		arg.Hash,
 		arg.PublishedAt,
 	)
 	return err
 }
 
 const listItems = `-- name: ListItems :many
-SELECT items.id, items.feed_id, items.title, items.link, items.description, items.status, items.published_at, items.created_at, items.updated_at, feeds.id, feeds.title, feeds.url, feeds.created_at, feeds.updated_at, feeds.last_refreshed_at, feeds.image FROM items
+SELECT items.id, items.feed_id, items.title, items.link, items.description, items.status, items.hash, items.published_at, items.created_at, items.updated_at, feeds.id, feeds.title, feeds.url, feeds.created_at, feeds.updated_at, feeds.last_refreshed_at, feeds.image FROM items
 JOIN feeds ON items.feed_id = feeds.id
 WHERE (CAST (? AS BOOL)  = 0 OR items.status  = ?)
 AND   (CAST (? AS BOOL) = 0 OR items.feed_id = ?)
@@ -104,6 +133,7 @@ func (q *Queries) ListItems(ctx context.Context, arg ListItemsParams) ([]ListIte
 			&i.Item.Link,
 			&i.Item.Description,
 			&i.Item.Status,
+			&i.Item.Hash,
 			&i.Item.PublishedAt,
 			&i.Item.CreatedAt,
 			&i.Item.UpdatedAt,
@@ -137,8 +167,31 @@ func (q *Queries) MarkAllItemsAsRead(ctx context.Context) error {
 	return err
 }
 
+const updateItem = `-- name: UpdateItem :exec
+UPDATE items SET title = ?, link = ?, description = ?, published_at = ? WHERE id = ?
+`
+
+type UpdateItemParams struct {
+	Title       string
+	Link        string
+	Description string
+	PublishedAt time.Time
+	ID          int64
+}
+
+func (q *Queries) UpdateItem(ctx context.Context, arg UpdateItemParams) error {
+	_, err := q.db.ExecContext(ctx, updateItem,
+		arg.Title,
+		arg.Link,
+		arg.Description,
+		arg.PublishedAt,
+		arg.ID,
+	)
+	return err
+}
+
 const updateItemStatus = `-- name: UpdateItemStatus :one
-UPDATE items SET status = ? WHERE id = ? RETURNING id, feed_id, title, link, description, status, published_at, created_at, updated_at
+UPDATE items SET status = ? WHERE id = ? RETURNING id, feed_id, title, link, description, status, hash, published_at, created_at, updated_at
 `
 
 type UpdateItemStatusParams struct {
@@ -156,6 +209,7 @@ func (q *Queries) UpdateItemStatus(ctx context.Context, arg UpdateItemStatusPara
 		&i.Link,
 		&i.Description,
 		&i.Status,
+		&i.Hash,
 		&i.PublishedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,

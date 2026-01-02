@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/ethansaxenian/rss/database"
-	"github.com/mmcdole/gofeed"
+	"github.com/ethansaxenian/rss/rss"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -93,18 +93,18 @@ func (w *Worker) refreshFeeds(ctx context.Context) error {
 func (w *Worker) refreshFeed(ctx context.Context, feed database.Feed) error {
 	logger := w.log.With("feed_id", feed.ID, "url", feed.URL)
 
-	now := time.Now().UTC()
+	// now := time.Now().UTC()
 
-	if feed.LastRefreshedAt != nil && feed.LastRefreshedAt.Add(refreshThrottleInverval).After(now) {
-		logger.Warn("Refresh triggered too quickly. Try again later.", "can_refresh_at", feed.LastRefreshedAt.Add(refreshThrottleInverval).Local())
-		return nil
-	}
+	// if feed.LastRefreshedAt != nil && feed.LastRefreshedAt.Add(refreshThrottleInverval).After(now) {
+	// 	logger.Warn("Refresh triggered too quickly. Try again later.", "can_refresh_at", feed.LastRefreshedAt.Add(refreshThrottleInverval).Local())
+	// 	return nil
+	// }
 
 	logger.Info("Refreshing feed.")
 
-	res, err := gofeed.NewParser().ParseURLWithContext(feed.URL, ctx)
+	res, err := rss.FetchFeed(ctx, feed.URL)
 	if err != nil {
-		return fmt.Errorf("parsing feed URL: %w", err)
+		return fmt.Errorf("fetching feed URL: %w", err)
 	}
 
 	w.dbMu.Lock()
@@ -118,43 +118,16 @@ func (w *Worker) refreshFeed(ctx context.Context, feed database.Feed) error {
 
 	q := database.New(w.db).WithTx(tx)
 
-	var numNewItems int
-	for _, item := range res.Items {
-		if feed.LastRefreshedAt != nil && item.PublishedParsed.Before(*feed.LastRefreshedAt) {
-			continue
-		}
-
-		if err := q.CreateItem(
-			ctx,
-			database.CreateItemParams{
-				FeedID:      feed.ID,
-				Title:       item.Title,
-				Link:        item.Link,
-				Description: item.Description,
-				PublishedAt: (*item.PublishedParsed).UTC(), // Store as UTC
-			},
-		); err != nil {
-			return fmt.Errorf("creating item: %w", err)
-		}
-
-		numNewItems++
-	}
-
-	if res.Image != nil {
-		if err := q.UpdateFeedImage(ctx, database.UpdateFeedImageParams{Image: &res.Image.URL, ID: feed.ID}); err != nil {
-			logger.Error("Failed to update feeds.image.")
-		}
-	}
-
-	if err := q.UpdateFeedLastRefreshedAt(ctx, feed.ID); err != nil {
-		logger.Error("Failed to update feeds.last_refreshed_at.")
+	numNewItems, numUpdatedItems, err := rss.UpdateFeedItems(ctx, q, feed.ID, res, logger)
+	if err != nil {
+		return fmt.Errorf("updating feed items: %w", err)
 	}
 
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("committing transaction: %w", err)
 	}
 
-	logger.Info("Successfully refreshed feed.", "new_items", numNewItems)
+	logger.Info("Successfully refreshed feed.", "new_items", numNewItems, "updated_items", numUpdatedItems)
 
 	return nil
 }
