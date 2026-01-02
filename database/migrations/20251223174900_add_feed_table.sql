@@ -21,7 +21,7 @@ END;
 
 -- +goose Down
 -- +goose StatementBegin
-DELETE TRIGGER IF EXISTS feeds_set_updated_at;
-DELETE TABLE IF EXISTS feeds;
+DROP TRIGGER IF EXISTS feeds_set_updated_at;
+DROP TABLE IF EXISTS feeds;
 -- +goose StatementEnd
 

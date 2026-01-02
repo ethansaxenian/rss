@@ -1,7 +1,6 @@
 -- +goose Up
 -- +goose StatementBegin
 ALTER TABLE items ADD COLUMN hash TEXT;
-UPDATE items SET hash = link;
 
 CREATE TABLE items_temp (
   id INTEGER PRIMARY KEY,
@@ -10,15 +9,28 @@ CREATE TABLE items_temp (
   link TEXT NOT NULL,
   description TEXT NOT NULL DEFAULT '',
   status TEXT CHECK( status IN ('read', 'unread') ) NOT NULL DEFAULT 'unread',
-  hash TEXT NOT NULL,
   published_at TIMESTAMP NOT NULL,
+  hash TEXT NOT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
   updated_at TIMESTAMP,
 
   FOREIGN KEY(feed_id) REFERENCES feeds(id) ON DELETE CASCADE
 );
 
-INSERT INTO items_temp SELECT * FROM items;
+INSERT INTO
+  items_temp
+SELECT
+  id,
+  feed_id,
+  title,
+  link,
+  description,
+  status,
+  published_at,
+  link, -- temporarily set hash to link, hope this is ok
+  created_at,
+  updated_at
+FROM items;
 
 DROP TABLE items;
 
@@ -35,7 +47,6 @@ BEGIN
   SET updated_at = CURRENT_TIMESTAMP
   WHERE id = NEW.id;
 END;
-
 -- +goose StatementEnd
 
 -- +goose Down

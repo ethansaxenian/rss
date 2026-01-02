@@ -29,7 +29,7 @@ END;
 
 -- +goose Down
 -- +goose StatementBegin
-DELETE TRIGGER IF EXISTS items_set_updated_at;
-DELETE INDEX IF EXISTS items_published_at_ix;
-DELETE TABLE IF EXISTS items;
+DROP TRIGGER IF EXISTS items_set_updated_at;
+DROP INDEX IF EXISTS items_published_at_ix;
+DROP TABLE IF EXISTS items;
 -- +goose StatementEnd
