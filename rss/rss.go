@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 
 	"github.com/ethansaxenian/rss/database"
 	"github.com/mmcdole/gofeed"
@@ -44,6 +45,9 @@ func UpdateFeedItems(ctx context.Context, q *database.Queries, feedID int64, fee
 	var numNewItems int
 	var numUpdatedItems int
 	for _, item := range feed.Items {
+		if strings.HasPrefix(item.Link, "https://youtube.com/shorts/") {
+			continue
+		}
 
 		hash := GetItemHash(item)
 
