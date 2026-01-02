@@ -11,7 +11,7 @@ import (
 )
 
 const checkItemExists = `-- name: CheckItemExists :one
-SELECT id, feed_id, title, link, description, status, hash, published_at, created_at, updated_at FROM items WHERE feed_id = ? AND hash = ?
+SELECT id, feed_id, title, link, description, status, published_at, created_at, updated_at, hash FROM items WHERE feed_id = ? AND hash = ?
 `
 
 type CheckItemExistsParams struct {
@@ -29,10 +29,10 @@ func (q *Queries) CheckItemExists(ctx context.Context, arg CheckItemExistsParams
 		&i.Link,
 		&i.Description,
 		&i.Status,
-		&i.Hash,
 		&i.PublishedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Hash,
 	)
 	return i, err
 }
@@ -88,7 +88,7 @@ func (q *Queries) CreateItem(ctx context.Context, arg CreateItemParams) error {
 }
 
 const listItems = `-- name: ListItems :many
-SELECT items.id, items.feed_id, items.title, items.link, items.description, items.status, items.hash, items.published_at, items.created_at, items.updated_at, feeds.id, feeds.title, feeds.url, feeds.created_at, feeds.updated_at, feeds.last_refreshed_at, feeds.image FROM items
+SELECT items.id, items.feed_id, items.title, items.link, items.description, items.status, items.published_at, items.created_at, items.updated_at, items.hash, feeds.id, feeds.title, feeds.url, feeds.created_at, feeds.updated_at, feeds.last_refreshed_at, feeds.image FROM items
 JOIN feeds ON items.feed_id = feeds.id
 WHERE (CAST (? AS BOOL)  = 0 OR items.status  = ?)
 AND   (CAST (? AS BOOL) = 0 OR items.feed_id = ?)
@@ -133,10 +133,10 @@ func (q *Queries) ListItems(ctx context.Context, arg ListItemsParams) ([]ListIte
 			&i.Item.Link,
 			&i.Item.Description,
 			&i.Item.Status,
-			&i.Item.Hash,
 			&i.Item.PublishedAt,
 			&i.Item.CreatedAt,
 			&i.Item.UpdatedAt,
+			&i.Item.Hash,
 			&i.Feed.ID,
 			&i.Feed.Title,
 			&i.Feed.URL,
@@ -191,7 +191,7 @@ func (q *Queries) UpdateItem(ctx context.Context, arg UpdateItemParams) error {
 }
 
 const updateItemStatus = `-- name: UpdateItemStatus :one
-UPDATE items SET status = ? WHERE id = ? RETURNING id, feed_id, title, link, description, status, hash, published_at, created_at, updated_at
+UPDATE items SET status = ? WHERE id = ? RETURNING id, feed_id, title, link, description, status, published_at, created_at, updated_at, hash
 `
 
 type UpdateItemStatusParams struct {
@@ -209,10 +209,10 @@ func (q *Queries) UpdateItemStatus(ctx context.Context, arg UpdateItemStatusPara
 		&i.Link,
 		&i.Description,
 		&i.Status,
-		&i.Hash,
 		&i.PublishedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Hash,
 	)
 	return i, err
 }
