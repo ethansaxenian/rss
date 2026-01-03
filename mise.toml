@@ -69,10 +69,17 @@ run = "go tool goose down"
 
 [tasks.sqlc]
 description = "Regenerate sqlc files"
-sources = ["database/queries/*.sql"]
+sources = ["database/queries/*.sql", "sqlc.yaml"]
 run = "go tool sqlc generate"
 
 [tasks.templ]
 description = "Regenerate templ files"
 sources = ["components/**/*.templ"]
 run = "go tool templ generate"
+
+[tasks.lint]
+description = "Lint the project"
+run = [
+  "go tool golangci-lint run",
+  "go tool sqlc vet",
+]

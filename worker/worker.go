@@ -93,12 +93,12 @@ func (w *Worker) refreshFeeds(ctx context.Context) error {
 func (w *Worker) refreshFeed(ctx context.Context, feed database.Feed) error {
 	logger := w.log.With("feed_id", feed.ID, "url", feed.URL)
 
-	// now := time.Now().UTC()
+	now := time.Now().UTC()
 
-	// if feed.LastRefreshedAt != nil && feed.LastRefreshedAt.Add(refreshThrottleInverval).After(now) {
-	// 	logger.Warn("Refresh triggered too quickly. Try again later.", "can_refresh_at", feed.LastRefreshedAt.Add(refreshThrottleInverval).Local())
-	// 	return nil
-	// }
+	if feed.LastRefreshedAt.Valid && feed.LastRefreshedAt.Time.Add(refreshThrottleInverval).After(now) {
+		logger.Warn("Refresh triggered too quickly. Try again later.", "can_refresh_at", feed.LastRefreshedAt.Time.Add(refreshThrottleInverval).Local())
+		return nil
+	}
 
 	logger.Info("Refreshing feed.")
 

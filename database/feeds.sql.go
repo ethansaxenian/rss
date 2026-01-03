@@ -7,6 +7,7 @@ package database
 
 import (
 	"context"
+	"database/sql"
 )
 
 const createFeed = `-- name: CreateFeed :exec
@@ -18,6 +19,9 @@ type CreateFeedParams struct {
 	URL   string
 }
 
+// CreateFeed
+//
+//	INSERT INTO feeds(title, url) VALUES (?, ?)
 func (q *Queries) CreateFeed(ctx context.Context, arg CreateFeedParams) error {
 	_, err := q.db.ExecContext(ctx, createFeed, arg.Title, arg.URL)
 	return err
@@ -27,6 +31,9 @@ const getFeed = `-- name: GetFeed :one
 SELECT id, title, url, created_at, updated_at, last_refreshed_at, image FROM feeds WHERE id = ?
 `
 
+// GetFeed
+//
+//	SELECT id, title, url, created_at, updated_at, last_refreshed_at, image FROM feeds WHERE id = ?
 func (q *Queries) GetFeed(ctx context.Context, id int64) (Feed, error) {
 	row := q.db.QueryRowContext(ctx, getFeed, id)
 	var i Feed
@@ -46,6 +53,9 @@ const listFeeds = `-- name: ListFeeds :many
 SELECT id, title, url, created_at, updated_at, last_refreshed_at, image FROM feeds ORDER BY created_at DESC
 `
 
+// ListFeeds
+//
+//	SELECT id, title, url, created_at, updated_at, last_refreshed_at, image FROM feeds ORDER BY created_at DESC
 func (q *Queries) ListFeeds(ctx context.Context) ([]Feed, error) {
 	rows, err := q.db.QueryContext(ctx, listFeeds)
 	if err != nil {
@@ -82,10 +92,13 @@ UPDATE feeds SET image = ? WHERE id = ?
 `
 
 type UpdateFeedImageParams struct {
-	Image *string
+	Image sql.NullString
 	ID    int64
 }
 
+// UpdateFeedImage
+//
+//	UPDATE feeds SET image = ? WHERE id = ?
 func (q *Queries) UpdateFeedImage(ctx context.Context, arg UpdateFeedImageParams) error {
 	_, err := q.db.ExecContext(ctx, updateFeedImage, arg.Image, arg.ID)
 	return err
@@ -95,6 +108,9 @@ const updateFeedLastRefreshedAt = `-- name: UpdateFeedLastRefreshedAt :exec
 UPDATE feeds SET last_refreshed_at = CURRENT_TIMESTAMP WHERE id = ?
 `
 
+// UpdateFeedLastRefreshedAt
+//
+//	UPDATE feeds SET last_refreshed_at = CURRENT_TIMESTAMP WHERE id = ?
 func (q *Queries) UpdateFeedLastRefreshedAt(ctx context.Context, id int64) error {
 	_, err := q.db.ExecContext(ctx, updateFeedLastRefreshedAt, id)
 	return err

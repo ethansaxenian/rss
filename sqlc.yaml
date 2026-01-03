@@ -3,13 +3,15 @@ sql:
   - engine: "sqlite"
     queries: "queries"
     schema: "database/migrations"
+    strict_function_checks: true
     gen:
       go:
         out: "database"
         emit_empty_slices: true
-        emit_pointers_for_null_types: true
-        rename:
-          url: "URL"
+        emit_sql_as_comment: true
+        initialisms:
+          - "id"
+          - "url"
         overrides:
           - column: "items.status"
             go_type:

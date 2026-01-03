@@ -5,6 +5,7 @@
 package database
 
 import (
+	"database/sql"
 	"time"
 )
 
@@ -13,9 +14,9 @@ type Feed struct {
 	Title           string
 	URL             string
 	CreatedAt       time.Time
-	UpdatedAt       *time.Time
-	LastRefreshedAt *time.Time
-	Image           *string
+	UpdatedAt       sql.NullTime
+	LastRefreshedAt sql.NullTime
+	Image           sql.NullString
 }
 
 type Item struct {
@@ -27,6 +28,6 @@ type Item struct {
 	Status      Status
 	PublishedAt time.Time
 	CreatedAt   time.Time
-	UpdatedAt   *time.Time
+	UpdatedAt   sql.NullTime
 	Hash        string
 }

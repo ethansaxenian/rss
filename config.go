@@ -19,7 +19,7 @@ func getConfig() (config, error) {
 
 	dsn, ok := os.LookupEnv("DATABASE_URL")
 	if !ok {
-		return config{}, fmt.Errorf("empty DATABASE_URL")
+		return config{}, fmt.Errorf("empty DATABASE_URL") //nolint: err113
 	}
 
 	c := config{

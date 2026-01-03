@@ -28,8 +28,8 @@ templ feedsList(feeds []database.Feed) {
 templ feed(feed database.Feed) {
 	<div class="rounded-md m-2 p-2 bg-zinc-800 border border-gray-500 flex flex-col w-full md:w-200 max-w-full">
 		<span class="flex items-start">
-			if feed.Image != nil {
-				<img class="h-7 mr-2" src={ *feed.Image }/>
+			if feed.Image.Valid {
+				<img class="h-7 mr-2" src={ feed.Image.String }/>
 			}
 			<span
 				class="text-lg hover:text-white w-fit hover:cursor-pointer"

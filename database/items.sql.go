@@ -19,6 +19,9 @@ type CheckItemExistsParams struct {
 	Hash   string
 }
 
+// CheckItemExists
+//
+//	SELECT id, feed_id, title, link, description, status, published_at, created_at, updated_at, hash FROM items WHERE feed_id = ? AND hash = ?
 func (q *Queries) CheckItemExists(ctx context.Context, arg CheckItemExistsParams) (Item, error) {
 	row := q.db.QueryRowContext(ctx, checkItemExists, arg.FeedID, arg.Hash)
 	var i Item
@@ -50,6 +53,11 @@ type CountItemsParams struct {
 	FeedID    int64
 }
 
+// CountItems
+//
+//	SELECT COUNT(*) FROM items
+//	WHERE (CAST (?1 AS BOOL)  = 0 OR items.status  = ?2)
+//	AND   (CAST (?3 AS BOOL) = 0 OR items.feed_id = ?4)
 func (q *Queries) CountItems(ctx context.Context, arg CountItemsParams) (int64, error) {
 	row := q.db.QueryRowContext(ctx, countItems,
 		arg.HasStatus,
@@ -75,6 +83,9 @@ type CreateItemParams struct {
 	PublishedAt time.Time
 }
 
+// CreateItem
+//
+//	INSERT INTO items(feed_id, title, link, description, hash, published_at) VALUES (?, ?, ?, ?, ?, ?)
 func (q *Queries) CreateItem(ctx context.Context, arg CreateItemParams) error {
 	_, err := q.db.ExecContext(ctx, createItem,
 		arg.FeedID,
@@ -110,6 +121,14 @@ type ListItemsRow struct {
 	Feed Feed
 }
 
+// ListItems
+//
+//	SELECT items.id, items.feed_id, items.title, items.link, items.description, items.status, items.published_at, items.created_at, items.updated_at, items.hash, feeds.id, feeds.title, feeds.url, feeds.created_at, feeds.updated_at, feeds.last_refreshed_at, feeds.image FROM items
+//	JOIN feeds ON items.feed_id = feeds.id
+//	WHERE (CAST (? AS BOOL)  = 0 OR items.status  = ?)
+//	AND   (CAST (? AS BOOL) = 0 OR items.feed_id = ?)
+//	ORDER BY items.published_at DESC
+//	LIMIT ? OFFSET ?
 func (q *Queries) ListItems(ctx context.Context, arg ListItemsParams) ([]ListItemsRow, error) {
 	rows, err := q.db.QueryContext(ctx, listItems,
 		arg.HasStatus,
@@ -162,6 +181,9 @@ const markAllItemsAsRead = `-- name: MarkAllItemsAsRead :exec
 UPDATE items SET status = "read" WHERE status = "unread"
 `
 
+// MarkAllItemsAsRead
+//
+//	UPDATE items SET status = "read" WHERE status = "unread"
 func (q *Queries) MarkAllItemsAsRead(ctx context.Context) error {
 	_, err := q.db.ExecContext(ctx, markAllItemsAsRead)
 	return err
@@ -179,6 +201,9 @@ type UpdateItemParams struct {
 	ID          int64
 }
 
+// UpdateItem
+//
+//	UPDATE items SET title = ?, link = ?, description = ?, published_at = ? WHERE id = ?
 func (q *Queries) UpdateItem(ctx context.Context, arg UpdateItemParams) error {
 	_, err := q.db.ExecContext(ctx, updateItem,
 		arg.Title,
@@ -199,6 +224,9 @@ type UpdateItemStatusParams struct {
 	ID     int64
 }
 
+// UpdateItemStatus
+//
+//	UPDATE items SET status = ? WHERE id = ? RETURNING id, feed_id, title, link, description, status, published_at, created_at, updated_at, hash
 func (q *Queries) UpdateItemStatus(ctx context.Context, arg UpdateItemStatusParams) (Item, error) {
 	row := q.db.QueryRowContext(ctx, updateItemStatus, arg.Status, arg.ID)
 	var i Item

@@ -94,7 +94,11 @@ func UpdateFeedItems(ctx context.Context, q *database.Queries, feedID int64, fee
 	}
 
 	if feed.Image != nil {
-		if err := q.UpdateFeedImage(ctx, database.UpdateFeedImageParams{Image: &feed.Image.URL, ID: feedID}); err != nil {
+		var image sql.NullString
+		if err := image.Scan(feed.Image.URL); err != nil {
+			logger.Warn("Failed to convert feed image to sql.NullString", "value", feed.Image.URL, "title", feed.Image.Title)
+		}
+		if err := q.UpdateFeedImage(ctx, database.UpdateFeedImageParams{Image: image, ID: feedID}); err != nil {
 			logger.Error("Failed to update feeds.image.")
 		}
 	}
