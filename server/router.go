@@ -10,6 +10,7 @@ import (
 	"github.com/ethansaxenian/rss/components"
 	"github.com/ethansaxenian/rss/contextkeys"
 	"github.com/ethansaxenian/rss/database"
+	"github.com/ethansaxenian/rss/log"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
@@ -22,7 +23,7 @@ const (
 func (s *Server) NewRouter() chi.Router {
 	r := chi.NewRouter()
 
-	r.Use(middleware.Logger)
+	r.Use(log.Middleware(s.log))
 	r.Use(middleware.Recoverer)
 	r.Use(cors.Handler(cors.Options{AllowedOrigins: []string{"*"}}))
 	r.Use(middleware.RedirectSlashes)
@@ -97,6 +98,8 @@ func (s *Server) feedPage(conn *sql.Conn, w http.ResponseWriter, r *http.Request
 	if err != nil {
 		return fmt.Errorf("getting feed: %w", err)
 	}
+
+	log.Add(ctx, feed.LogValue())
 
 	count, err := q.CountItems(
 		ctx,
