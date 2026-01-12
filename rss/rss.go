@@ -45,7 +45,7 @@ func UpdateFeedItems(ctx context.Context, q *database.Queries, feedID int64, fee
 	var numNewItems int
 	var numUpdatedItems int
 	for _, item := range feed.Items {
-		if strings.HasPrefix(item.Link, "https://youtube.com/shorts/") {
+		if strings.HasPrefix(item.Link, "https://www.youtube.com/shorts/") {
 			continue
 		}
 
